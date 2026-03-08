@@ -1542,7 +1542,7 @@ void UIScene_LoadOrJoinMenu::LoadLevelGen(LevelGenerationOptions *levelGen)
     bool isClientSide = false;
     bool isPrivate = false;
     // TODO int maxPlayers = MINECRAFT_NET_MAX_PLAYERS;
-    int maxPlayers = 8;
+    int maxPlayers = MINECRAFT_NET_MAX_PLAYERS;
 
     if( app.GetTutorialMode() )
     {

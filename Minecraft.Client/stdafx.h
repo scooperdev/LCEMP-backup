@@ -107,9 +107,12 @@ typedef XNKID SessionID;
 typedef XUID GameSessionUID;
 #define HRESULT_SUCCEEDED(hr) (((HRESULT)(hr)) >= 0)
 
-#include "..\Minecraft.Client\xbox\network\extra.h"
-#else
 #include "extraX64.h"
+
+#else
+
+#include "extraX64.h"
+
 #endif
 
 #ifdef __PS3__

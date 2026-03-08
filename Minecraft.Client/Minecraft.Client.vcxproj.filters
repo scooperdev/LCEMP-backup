@@ -3631,9 +3631,6 @@
     <ClInclude Include="Orbis\Network\PsPlusUpsellWrapper_Orbis.h">
       <Filter>Orbis\Network</Filter>
     </ClInclude>
-    <ClInclude Include="Xbox\Network\extra.h">
-      <Filter>Xbox\Source Files\Network</Filter>
-    </ClInclude>
     <ClInclude Include="Common\UI\UIScene_Keyboard.h">
       <Filter>Common\Source Files\UI\Scenes</Filter>
     </ClInclude>

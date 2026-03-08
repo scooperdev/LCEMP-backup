@@ -41,6 +41,8 @@
 
 #include "Network\WinsockNetLayer.h"
 
+#include "..\PlayerRenderer.h"
+
 #include "Windows64_PostProcess.h"
 
 #include "Xbox/resource.h"
@@ -832,6 +834,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			g_Win64MultiplayerPort = atoi(portBuf);
 			if (g_Win64MultiplayerPort <= 0) g_Win64MultiplayerPort = WIN64_NET_DEFAULT_PORT;
 		}
+
 	}
 
 	if (g_Win64Username[0] == 0)
@@ -1039,6 +1042,8 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	}
 	extern wchar_t g_Win64UsernameW[17];
 	wcscpy_s(IQNet::m_player[0].m_gamertag, 32, g_Win64UsernameW);
+
+	PlayerRenderer::InitNametagColors();
 
 	WinsockNetLayer::Initialize();
 

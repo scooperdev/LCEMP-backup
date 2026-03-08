@@ -355,7 +355,8 @@ IQNetPlayer *IQNet::GetLocalPlayerByUserIndex(DWORD dwUserIndex)
 static bool Win64_IsActivePlayer(IQNetPlayer *p, DWORD index)
 {
 	if (index == 0) return true;
-	return (p->GetCustomDataValue() != 0);
+	if (p->GetCustomDataValue() != 0) return true;
+	return (p->m_isRemote && p->m_gamertag[0] != 0);
 }
 
 IQNetPlayer *IQNet::GetPlayerByIndex(DWORD dwPlayerIndex)

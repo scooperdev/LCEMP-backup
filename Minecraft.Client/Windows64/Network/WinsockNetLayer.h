@@ -15,6 +15,7 @@
 #define WIN64_NET_MAX_PACKET_SIZE (3 * 1024 * 1024)
 #define WIN64_LAN_DISCOVERY_PORT 25566
 #define WIN64_LAN_BROADCAST_MAGIC 0x4D434C4E
+#define WIN64_LAN_BROADCAST_PLAYERS 8
 
 class Socket;
 
@@ -31,7 +32,7 @@ struct Win64LANBroadcast
 	DWORD texturePackParentId;
 	BYTE subTexturePackId;
 	BYTE isJoinable;
-	char playerNames[8][XUSER_NAME_SIZE];
+	char playerNames[WIN64_LAN_BROADCAST_PLAYERS][XUSER_NAME_SIZE];
 };
 #pragma pack(pop)
 
@@ -48,7 +49,7 @@ struct Win64LANSession
 	unsigned char subTexturePackId;
 	bool isJoinable;
 	DWORD lastSeenTick;
-	char playerNames[8][XUSER_NAME_SIZE];
+	char playerNames[WIN64_LAN_BROADCAST_PLAYERS][XUSER_NAME_SIZE];
 };
 
 struct Win64RemoteConnection

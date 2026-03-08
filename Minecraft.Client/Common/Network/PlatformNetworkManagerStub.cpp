@@ -801,7 +801,7 @@ void CPlatformNetworkManagerStub::SearchForGames()
 
 		memset(info->data.players, 0, sizeof(info->data.players));
 		memset(info->data.szPlayers, 0, sizeof(info->data.szPlayers));
-		for (int p = 0; p < MINECRAFT_NET_MAX_PLAYERS && p < lanSessions[i].playerCount; p++)
+		for (int p = 0; p < WIN64_LAN_BROADCAST_PLAYERS && p < lanSessions[i].playerCount; p++)
 		{
 			if (lanSessions[i].playerNames[p][0] != 0)
 			{

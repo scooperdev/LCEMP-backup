@@ -400,7 +400,7 @@ void MobRenderer::renderNameTag(shared_ptr<Mob> mob, const wstring& OriginalName
 	if (player != NULL && app.isXuidDeadmau5( player->getXuid() ) ) offs = -10;
 
 	wstring playerName;
-	WCHAR wchName[2];
+	WCHAR wchName[8];
 
 #if defined(__PS3__) || defined(__ORBIS__)
 	// Check we have all the font characters for this player name
@@ -414,8 +414,8 @@ void MobRenderer::renderNameTag(shared_ptr<Mob> mob, const wstring& OriginalName
 		}
 		else
 		{
-			memset(wchName,0,sizeof(WCHAR)*2);
-			swprintf(wchName, 2, L"%d",player->getPlayerIndex()+1);		
+			memset(wchName,0,sizeof(wchName));
+			swprintf(wchName, 8, L"%d",player->getPlayerIndex()+1);		
 			playerName=wchName;
 			player->SetPlayerNameValidState(false);
 		}
@@ -424,8 +424,8 @@ void MobRenderer::renderNameTag(shared_ptr<Mob> mob, const wstring& OriginalName
 		playerName=OriginalName;
 		break;
 	case Player::ePlayerNameValid_False:
-		memset(wchName,0,sizeof(WCHAR)*2);
-		swprintf(wchName, 2, L"%d",player->getPlayerIndex()+1);		
+		memset(wchName,0,sizeof(wchName));
+		swprintf(wchName, 8, L"%d",player->getPlayerIndex()+1);		
 		playerName=wchName;	
 		break;
 	}

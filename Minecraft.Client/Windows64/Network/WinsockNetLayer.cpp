@@ -797,7 +797,7 @@ void WinsockNetLayer::UpdateAdvertisePlayerNames(BYTE count, const char playerNa
 	EnterCriticalSection(&s_advertiseLock);
 	memset(s_advertiseData.playerNames, 0, sizeof(s_advertiseData.playerNames));
 	s_advertiseData.playerCount = count;
-	for (int i = 0; i < count && i < 8; i++)
+	for (int i = 0; i < count && i < WIN64_LAN_BROADCAST_PLAYERS; i++)
 	{
 		memcpy(s_advertiseData.playerNames[i], playerNames[i], XUSER_NAME_SIZE);
 	}
@@ -936,7 +936,7 @@ DWORD WINAPI WinsockNetLayer::DiscoveryThreadProc(LPVOID param)
 
 		broadcast->hostName[31] = L'\0';
 
-		for (int pn = 0; pn < 8; pn++)
+		for (int pn = 0; pn < WIN64_LAN_BROADCAST_PLAYERS; pn++)
 			broadcast->playerNames[pn][XUSER_NAME_SIZE - 1] = '\0';
 
 		char senderIP[64];

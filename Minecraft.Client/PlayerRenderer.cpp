@@ -13,19 +13,44 @@
 #include "..\Minecraft.World\net.minecraft.h"
 #include "..\Minecraft.World\StringHelpers.h"
 
-const unsigned int PlayerRenderer::s_nametagColors[MINECRAFT_NET_MAX_PLAYERS] = 
+unsigned int PlayerRenderer::s_nametagColors[MINECRAFT_NET_MAX_PLAYERS];
+
+static unsigned int HsvToArgb(float h, float s, float v)
 {
-	0xff000000, // WHITE (represents the "white" player, but using black as the colour)
-	0xff33cc33, // GREEN
-	0xffcc3333, // RED
-	0xff3333cc, // BLUE
-#ifndef __PSVITA__		// only 4 player on Vita
-	0xffcc33cc, // PINK
-	0xffcc6633, // ORANGE
-	0xffcccc33, // YELLOW
-	0xff33dccc, // TURQUOISE
-#endif
-};
+	float c = v * s;
+	float x = c * (1.0f - fabsf(fmodf(h / 60.0f, 2.0f) - 1.0f));
+	float m = v - c;
+	float r, g, b;
+	if (h < 60) { r = c; g = x; b = 0; }
+	else if (h < 120) { r = x; g = c; b = 0; }
+	else if (h < 180) { r = 0; g = c; b = x; }
+	else if (h < 240) { r = 0; g = x; b = c; }
+	else if (h < 300) { r = x; g = 0; b = c; }
+	else { r = c; g = 0; b = x; }
+	unsigned int ri = (unsigned int)((r + m) * 255.0f);
+	unsigned int gi = (unsigned int)((g + m) * 255.0f);
+	unsigned int bi = (unsigned int)((b + m) * 255.0f);
+	return 0xFF000000 | (ri << 16) | (gi << 8) | bi;
+}
+
+void PlayerRenderer::InitNametagColors()
+{
+	s_nametagColors[0] = 0xff000000;
+	s_nametagColors[1] = 0xff33cc33;
+	s_nametagColors[2] = 0xffcc3333;
+	s_nametagColors[3] = 0xff3333cc;
+	s_nametagColors[4] = 0xffcc33cc;
+	s_nametagColors[5] = 0xffcc6633;
+	s_nametagColors[6] = 0xffcccc33;
+	s_nametagColors[7] = 0xff33dccc;
+	for (int i = 8; i < MINECRAFT_NET_MAX_PLAYERS; i++)
+	{
+		float hue = fmodf(i * 137.508f, 360.0f);
+		float sat = 0.65f + (float)(i % 3) * 0.15f;
+		float val = 0.75f + (float)(i % 4) * 0.08f;
+		s_nametagColors[i] = HsvToArgb(hue, sat, val);
+	}
+}
 
 const wstring PlayerRenderer::MATERIAL_NAMES[5] = { L"cloth", L"chain", L"iron", L"diamond", L"gold" };
 
@@ -304,11 +329,11 @@ void PlayerRenderer::renderName(shared_ptr<Mob> _mob, double x, double y, double
 			{
                 if (mob->isSleeping())
 				{
-                    renderNameTag(mob, msg, x, y - 1.5f, z, 64, s_nametagColors[mob->getPlayerIndex()]);
+                    renderNameTag(mob, msg, x, y - 1.5f, z, 64, getNametagColour(mob->getPlayerIndex()));
                 }
 				else
 				{
-                    renderNameTag(mob, msg, x, y, z, 64, s_nametagColors[mob->getPlayerIndex()]);
+                    renderNameTag(mob, msg, x, y, z, 64, getNametagColour(mob->getPlayerIndex()));
                 }
             }
         }
