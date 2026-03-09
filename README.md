@@ -1,3 +1,6 @@
+> This is not my code!!! I have done nothing to this codebase and simply made this fork for archival/study purposes. All credit goes to NOTPIES, smartcmd, and others who contributed 
+> to the development of forks for the 4J source. All credit goes to them, 4J, Mojang, and Microsoft. This code is not my own.
+
 # Minecraft LCEMP
 LCEMP is my Minecraft Legacy Console Edition source fork that enables LAN multiplayer hosting along side more complete pc compatibility.
 
