@@ -56,7 +56,9 @@ PlayerList::PlayerList(MinecraftServer *server)
 
     //int viewDistance = server->settings->getInt(L"view-distance", 10);
 
-#ifdef _WINDOWS64
+#ifdef _DEDICATED_SERVER
+    maxPlayers = server->settings->getInt(L"max-players", 8);
+#elif defined(_WINDOWS64)
     maxPlayers = MINECRAFT_NET_MAX_PLAYERS;
 #else
     maxPlayers = server->settings->getInt(L"max-players", 20);
@@ -481,19 +483,11 @@ void PlayerList::remove(shared_ptr<ServerPlayer> player)
 
 shared_ptr<ServerPlayer> PlayerList::getPlayerForLogin(PendingConnection *pendingConnection, const wstring& userName, PlayerUID xuid, PlayerUID onlineXuid)
 {
-#ifdef _WINDOWS64
-    if (players.size() >= (unsigned int)MINECRAFT_NET_MAX_PLAYERS)
+    if (players.size() >= (unsigned int)maxPlayers)
     {
         pendingConnection->disconnect(DisconnectPacket::eDisconnect_ServerFull);
         return shared_ptr<ServerPlayer>();
     }
-#else
-    if (players.size() >= maxPlayers)
-	{
-        pendingConnection->disconnect(DisconnectPacket::eDisconnect_ServerFull);
-        return shared_ptr<ServerPlayer>();
-    }
-#endif
 	
 	shared_ptr<ServerPlayer> player = shared_ptr<ServerPlayer>(new ServerPlayer(server, server->getLevel(0), userName, new ServerPlayerGameMode(server->getLevel(0)) ));
 	player->gameMode->player = player; // 4J added as had to remove this assignment from ServerPlayer ctor
