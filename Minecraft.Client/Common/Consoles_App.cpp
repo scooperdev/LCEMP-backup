@@ -8719,8 +8719,16 @@ bool CMinecraftApp::DLCContentRetrieved(eDLCMarketplaceType eType)
 
 void CMinecraftApp::SetAdditionalSkinBoxes(DWORD dwSkinID, SKIN_BOX *SkinBoxA, DWORD dwSkinBoxC)
 {
-	EntityRenderer *renderer = EntityRenderDispatcher::instance->getRenderer(eTYPE_PLAYER);
-	Model *pModel = renderer->getModel();
+	EntityRenderer *renderer = NULL;
+	Model *pModel = NULL;
+	
+	if (EntityRenderDispatcher::instance != NULL) {
+		renderer = EntityRenderDispatcher::instance->getRenderer(eTYPE_PLAYER);
+		if (renderer != NULL) {
+			pModel = renderer->getModel();
+		}
+	}
+	
 	vector<ModelPart *> *pvModelPart = new vector<ModelPart *>;
 	vector<SKIN_BOX *> *pvSkinBoxes = new vector<SKIN_BOX *>;
 
@@ -8751,8 +8759,16 @@ void CMinecraftApp::SetAdditionalSkinBoxes(DWORD dwSkinID, SKIN_BOX *SkinBoxA, D
 
 vector<ModelPart *> * CMinecraftApp::SetAdditionalSkinBoxes(DWORD dwSkinID, vector<SKIN_BOX *> *pvSkinBoxA)
 {
-	EntityRenderer *renderer = EntityRenderDispatcher::instance->getRenderer(eTYPE_PLAYER);
-	Model *pModel = renderer->getModel();
+	EntityRenderer *renderer = NULL;
+	Model *pModel = NULL;
+	
+	if (EntityRenderDispatcher::instance != NULL) {
+		renderer = EntityRenderDispatcher::instance->getRenderer(eTYPE_PLAYER);
+		if (renderer != NULL) {
+			pModel = renderer->getModel();
+		}
+	}
+	
 	vector<ModelPart *> *pvModelPart = new vector<ModelPart *>;
 
 	EnterCriticalSection( &csAdditionalModelParts );
