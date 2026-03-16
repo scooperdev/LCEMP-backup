@@ -59,6 +59,7 @@ char g_Win64MultiplayerIP[256] = "127.0.0.1";
 
 bool g_ServerAdvertiseLAN = true;
 char g_ServerBindAddress[256] = "";
+int g_ServerMaxPlayers = MINECRAFT_NET_MAX_PLAYERS;
 
 bool WinsockNetLayer::Initialize()
 {
@@ -573,7 +574,7 @@ DWORD WINAPI WinsockNetLayer::AcceptThreadProc(LPVOID param)
 			assignedSmallId = s_freeSmallIds.back();
 			s_freeSmallIds.pop_back();
 		}
-		else if (s_nextSmallId < MINECRAFT_NET_MAX_PLAYERS)
+		else if (s_nextSmallId < g_ServerMaxPlayers)
 		{
 			assignedSmallId = s_nextSmallId++;
 		}
@@ -816,7 +817,7 @@ bool WinsockNetLayer::StartAdvertising(int gamePort, const wchar_t *hostName, un
 	s_advertiseData.gamePort = (WORD)gamePort;
 	wcsncpy_s(s_advertiseData.hostName, 32, hostName, _TRUNCATE);
 	s_advertiseData.playerCount = 1;
-	s_advertiseData.maxPlayers = MINECRAFT_NET_MAX_PLAYERS;
+	s_advertiseData.maxPlayers = g_ServerMaxPlayers;
 	s_advertiseData.gameHostSettings = gameSettings;
 	s_advertiseData.texturePackParentId = texPackId;
 	s_advertiseData.subTexturePackId = subTexId;
