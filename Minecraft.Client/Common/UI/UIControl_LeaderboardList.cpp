@@ -111,7 +111,7 @@ void UIControl_LeaderboardList::setColumnIcon(int iColumn, int iType)
 	IggyResult out = IggyPlayerCallMethodRS ( m_parentScene->getMovie() , &result, getIggyValuePath(), m_funcSetColumnIcon , 2 , value );
 }
 
-void UIControl_LeaderboardList::addDataSet(bool bLast, int iId, int iRank, const wstring &gamertag, bool bDisplayMessage, const wstring &col0, const wstring &col1, const wstring &col2, const wstring &col3, const wstring &col4, const wstring &col5, const wstring &col6)
+void UIControl_LeaderboardList::addDataSet(bool bLast, int iId, int iRank, const wstring &gamertag, const wstring &col0, const wstring &col1, const wstring &col2, const wstring &col3, const wstring &col4, const wstring &col5, const wstring &col6, bool bDisplayMessage)
 {
 	IggyDataValue result;
 	IggyDataValue value[12];
@@ -131,92 +131,92 @@ void UIControl_LeaderboardList::addDataSet(bool bLast, int iId, int iRank, const
 	value[3].type = IGGY_DATATYPE_string_UTF16;
 	value[3].string16 = stringVal0;
 
-	value[4].type = IGGY_DATATYPE_boolean;
-	value[4].boolval = bDisplayMessage;
-
 	IggyStringUTF16 stringVal1;
 	stringVal1.string = (IggyUTF16*)col0.c_str();
 	stringVal1.length = col0.length();
-	value[5].type = IGGY_DATATYPE_string_UTF16;
-	value[5].string16 = stringVal1;
+	value[4].type = IGGY_DATATYPE_string_UTF16;
+	value[4].string16 = stringVal1;
 
 	if(col1.empty())
 	{
-		value[6].type = IGGY_DATATYPE_null;
+		value[5].type = IGGY_DATATYPE_null;
 	}
 	else
 	{
 		IggyStringUTF16 stringVal2;
 		stringVal2.string = (IggyUTF16*)col1.c_str();
 		stringVal2.length = col1.length();
-		value[6].type = IGGY_DATATYPE_string_UTF16;
-		value[6].string16 = stringVal2;
+		value[5].type = IGGY_DATATYPE_string_UTF16;
+		value[5].string16 = stringVal2;
 	}
 
 	if(col2.empty())
 	{
-		value[7].type = IGGY_DATATYPE_null;
+		value[6].type = IGGY_DATATYPE_null;
 	}
 	else
 	{
 		IggyStringUTF16 stringVal3;
 		stringVal3.string = (IggyUTF16*)col2.c_str();
 		stringVal3.length = col2.length();
-		value[7].type = IGGY_DATATYPE_string_UTF16;
-		value[7].string16 = stringVal3;
+		value[6].type = IGGY_DATATYPE_string_UTF16;
+		value[6].string16 = stringVal3;
 	}
 
 	if(col3.empty())
 	{
-		value[8].type = IGGY_DATATYPE_null;
+		value[7].type = IGGY_DATATYPE_null;
 	}
 	else
 	{
 		IggyStringUTF16 stringVal4;
 		stringVal4.string = (IggyUTF16*)col3.c_str();
 		stringVal4.length = col3.length();
-		value[8].type = IGGY_DATATYPE_string_UTF16;
-		value[8].string16 = stringVal4;
+		value[7].type = IGGY_DATATYPE_string_UTF16;
+		value[7].string16 = stringVal4;
 	}
 
 	if(col4.empty())
 	{
-		value[9].type = IGGY_DATATYPE_null;
+		value[8].type = IGGY_DATATYPE_null;
 	}
 	else
 	{
 		IggyStringUTF16 stringVal5;
 		stringVal5.string = (IggyUTF16*)col4.c_str();
 		stringVal5.length = col4.length();
-		value[9].type = IGGY_DATATYPE_string_UTF16;
-		value[9].string16 = stringVal5;
+		value[8].type = IGGY_DATATYPE_string_UTF16;
+		value[8].string16 = stringVal5;
 	}
 
 	if(col5.empty())
 	{
-		value[10].type = IGGY_DATATYPE_null;
+		value[9].type = IGGY_DATATYPE_null;
 	}
 	else
 	{
 		IggyStringUTF16 stringVal6;
 		stringVal6.string = (IggyUTF16*)col5.c_str();
 		stringVal6.length = col5.length();
-		value[10].type = IGGY_DATATYPE_string_UTF16;
-		value[10].string16 = stringVal6;
+		value[9].type = IGGY_DATATYPE_string_UTF16;
+		value[9].string16 = stringVal6;
 	}
 
 	if(col6.empty())
 	{
-		value[11].type = IGGY_DATATYPE_null;
+		value[10].type = IGGY_DATATYPE_null;
 	}
 	else
 	{
 		IggyStringUTF16 stringVal7;
 		stringVal7.string = (IggyUTF16*)col6.c_str();
 		stringVal7.length = col6.length();
-		value[11].type = IGGY_DATATYPE_string_UTF16;
-		value[11].string16 = stringVal7;
+		value[10].type = IGGY_DATATYPE_string_UTF16;
+		value[10].string16 = stringVal7;
 	}
+
+	value[11].type = IGGY_DATATYPE_boolean;
+	value[11].boolval = bDisplayMessage;
 	IggyResult out = IggyPlayerCallMethodRS ( m_parentScene->getMovie() , &result, getIggyValuePath(), m_funcAddDataSet , 12 , value );
 }
 

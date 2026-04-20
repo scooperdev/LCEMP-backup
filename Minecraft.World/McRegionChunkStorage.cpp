@@ -14,6 +14,7 @@ C4JThread *McRegionChunkStorage::s_saveThreads[3];
 McRegionChunkStorage::McRegionChunkStorage(ConsoleSaveFile *saveFile, const wstring &prefix) : m_prefix( prefix )
 {
 	m_saveFile = saveFile;
+	InitializeCriticalSectionAndSpinCount(&m_csEntityData, 4000);
 
 	// Make sure that if there are any files for regions to be created, that they are created in the order that suits us for making the initial level save work fast
 	if( prefix == L"" )
@@ -68,6 +69,7 @@ McRegionChunkStorage::~McRegionChunkStorage()
 	{
 		delete it->second.data;
 	}
+	DeleteCriticalSection(&m_csEntityData);
 }
 
 LevelChunk *McRegionChunkStorage::load(Level *level, int x, int z)
@@ -75,17 +77,18 @@ LevelChunk *McRegionChunkStorage::load(Level *level, int x, int z)
 	DataInputStream *regionChunkInputStream = RegionFileCache::getChunkDataInputStream(m_saveFile, m_prefix, x, z);
 
 #ifdef SPLIT_SAVES
-	// If we can't find the chunk in the save file, then we should remove any entities we might have for that chunk
 	if(regionChunkInputStream == NULL)
 	{
 		__int64 index = ((__int64)(x) << 32) | (((__int64)(z))&0x00000000FFFFFFFF);
 
+		EnterCriticalSection(&m_csEntityData);
 		AUTO_VAR(it, m_entityData.find(index));
 		if(it != m_entityData.end())
 		{
 			delete it->second.data;
 			m_entityData.erase(it);
 		}
+		LeaveCriticalSection(&m_csEntityData);
 	}
 #endif
 
@@ -237,10 +240,11 @@ void McRegionChunkStorage::saveEntities(Level *level, LevelChunk *levelChunk)
 	PIXBeginNamedEvent(0,"Saving entities");
 	__int64 index = ((__int64)(levelChunk->x) << 32) | (((__int64)(levelChunk->z))&0x00000000FFFFFFFF);
 
-	delete m_entityData[index].data;
-
 	CompoundTag *newTag = new CompoundTag();
 	bool savedEntities = OldChunkStorage::saveEntities(levelChunk, level, newTag);
+
+	EnterCriticalSection(&m_csEntityData);
+	delete m_entityData[index].data;
 
 	if(savedEntities)
 	{
@@ -261,6 +265,7 @@ void McRegionChunkStorage::saveEntities(Level *level, LevelChunk *levelChunk)
 			m_entityData.erase(it);
 		}
 	}
+	LeaveCriticalSection(&m_csEntityData);
 	delete newTag;
 	PIXEndNamedEvent();
 #endif
@@ -271,15 +276,21 @@ void McRegionChunkStorage::loadEntities(Level *level, LevelChunk *levelChunk)
 #ifdef SPLIT_SAVES
 	__int64 index = ((__int64)(levelChunk->x) << 32) | (((__int64)(levelChunk->z))&0x00000000FFFFFFFF);
 	
+	EnterCriticalSection(&m_csEntityData);
 	AUTO_VAR(it, m_entityData.find(index));
 	if(it != m_entityData.end())
 	{
 		ByteArrayInputStream bais(it->second);
 		DataInputStream dis(&bais);
 		CompoundTag *tag = NbtIo::read(&dis);
+		LeaveCriticalSection(&m_csEntityData);
 		OldChunkStorage::loadEntities(levelChunk, level, tag);
 		bais.reset();
 		delete tag;
+	}
+	else
+	{
+		LeaveCriticalSection(&m_csEntityData);
 	}
 #endif
 }
@@ -299,6 +310,7 @@ void McRegionChunkStorage::flush()
 	DataOutputStream dos(&bos);
 
 	PIXBeginNamedEvent(0,"Writing to stream");
+	EnterCriticalSection(&m_csEntityData);
 	dos.writeInt(m_entityData.size());
 
 	for(AUTO_VAR(it,m_entityData.begin()); it != m_entityData.end(); ++it)
@@ -306,6 +318,7 @@ void McRegionChunkStorage::flush()
 		dos.writeLong(it->first);
 		dos.write(it->second,0,it->second.length);
 	}
+	LeaveCriticalSection(&m_csEntityData);
 	bos.flush();
 	PIXEndNamedEvent();
 	PIXEndNamedEvent();

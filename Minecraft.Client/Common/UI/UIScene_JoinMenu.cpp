@@ -10,6 +10,8 @@
 
 #define UPDATE_PLAYERS_TIMER_ID 0
 #define UPDATE_PLAYERS_TIMER_TIME 30000
+#define CONNECT_POLL_TIMER_ID 1
+#define CONNECT_POLL_TIMER_TIME 100
 
 UIScene_JoinMenu::UIScene_JoinMenu(int iPad, void *_initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
 {
@@ -524,10 +526,14 @@ void UIScene_JoinMenu::JoinGame(UIScene_JoinMenu* pClass)
 #endif
 		CGameNetworkManager::eJoinGameResult result = g_NetworkManager.JoinGame( pClass->m_selectedSession, dwLocalUsersMask );
 
-		// Alert the app the we no longer want to be informed of ethernet connections
 		app.SetLiveLinkRequired( false );
 
-		if( result != CGameNetworkManager::JOINGAME_SUCCESS )
+		if( result == CGameNetworkManager::JOINGAME_PENDING )
+		{
+			pClass->m_bIgnoreInput = true;
+			pClass->addTimer(CONNECT_POLL_TIMER_ID, CONNECT_POLL_TIMER_TIME);
+		}
+		else if( result != CGameNetworkManager::JOINGAME_SUCCESS )
 		{
 			int exitReasonStringId = -1;
 			switch(result)
@@ -558,6 +564,22 @@ void UIScene_JoinMenu::handleTimerComplete(int id)
 {
 	switch(id)
 	{
+	case CONNECT_POLL_TIMER_ID:
+		{
+			if (g_NetworkManager.IsJoinPending())
+			{
+				addTimer(CONNECT_POLL_TIMER_ID, CONNECT_POLL_TIMER_TIME);
+			}
+			else if (!g_NetworkManager.IsInSession())
+			{
+				m_bIgnoreInput = false;
+				UINT uiIDA[1];
+				uiIDA[0] = IDS_CONFIRM_OK;
+				ui.RequestMessageBox( IDS_CONNECTION_FAILED, IDS_CONNECTION_LOST_SERVER, uiIDA,1,ProfileManager.GetPrimaryPad(),NULL,NULL, app.GetStringTable());
+				ui.NavigateBack(m_iPad);
+			}
+		}
+		break;
 	case UPDATE_PLAYERS_TIMER_ID:
 		{
 #if TO_BE_IMPLEMENTED

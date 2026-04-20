@@ -17,10 +17,8 @@ bool RegionFileCache::useSplitSaves(ESavePlatform platform)
 	};
 }
 
-RegionFile *RegionFileCache::_getRegionFile(ConsoleSaveFile *saveFile, const wstring &prefix, int chunkX, int chunkZ)		// 4J - synchronized restored
+RegionFile *RegionFileCache::_getRegionFile(ConsoleSaveFile *saveFile, const wstring &prefix, int chunkX, int chunkZ)
 {
-	EnterCriticalSection(&m_cs);
-
 	// 4J Jev - changed back to use of the File class.
 	MemSect(31);
 	File file;
@@ -34,28 +32,29 @@ RegionFile *RegionFileCache::_getRegionFile(ConsoleSaveFile *saveFile, const wst
 	}
 	MemSect(0);
 
+	EnterCriticalSection(&m_cs);
+
 	RegionFile *ref = NULL;
 	AUTO_VAR(it, cache.find(file));
 	if( it != cache.end() )
 		ref = it->second;
 
 	// 4J Jev, put back in.
-    if (ref != NULL)
+	if (ref != NULL)
 	{
 		LeaveCriticalSection(&m_cs);
 		return ref;
-    }
+	}
 
-    if (cache.size() >= MAX_CACHE_SIZE)
+	if (cache.size() >= MAX_CACHE_SIZE)
 	{
-        _clear();
-    }
+		_clear();
+	}
 
 	RegionFile *reg = new RegionFile(saveFile, &file);
-    cache[file] = reg;	   // 4J - this was originally a softReference
+	cache[file] = reg; 	   // 4J - this was originally a softReference
 	LeaveCriticalSection(&m_cs);
-    return reg;
-
+	return reg;
 }
 
 void RegionFileCache::_clear()															// 4J - synchronized (recursive CS is safe here)

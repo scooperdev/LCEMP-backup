@@ -4,6 +4,7 @@ set(MINECRAFT_SERVER_OWN_SOURCES
     "Core/ServerLogger.cpp"
     "Core/ServerLists.cpp"
     "Core/ServerProperties.cpp"
+    "Core/ServerThreadPool.cpp"
     "Stubs/ServerStubs.cpp"
     "Stubs/ServerStubs2.cpp"
     "Stubs/ServerStubs3.cpp"

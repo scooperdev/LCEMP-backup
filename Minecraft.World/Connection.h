@@ -49,6 +49,7 @@ private:
 	DataOutputStream *byteArrayDos; // 4J This dos allows us to write individual packets to the socket
 	ByteArrayOutputStream *baos;
 	Socket::SocketOutputStream *sos;
+	volatile LONG m_closeState;
 
 	bool running;
 
@@ -87,6 +88,7 @@ public:
 
 private:
 	void _init();
+	void shutdownConnectionResources();
 
 	// 4J Jev, these might be better of as private
 	CRITICAL_SECTION threadCounterLock;

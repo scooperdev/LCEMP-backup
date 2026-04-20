@@ -316,7 +316,11 @@ int UIScene_AnvilMenu::KeyboardCompleteCallback(LPVOID lpParam,bool bRes)
 	{
 		uint16_t pchText[128];
 		ZeroMemory(pchText, 128 * sizeof(uint16_t) );
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::GetText(pchText);
+	#else
 		InputManager.GetText(pchText);
+	#endif
 		pClass->setEditNameValue((wchar_t *)pchText);
 		pClass->m_itemName = (wchar_t *)pchText;
 		pClass->updateItemName();
@@ -327,7 +331,9 @@ int UIScene_AnvilMenu::KeyboardCompleteCallback(LPVOID lpParam,bool bRes)
 void UIScene_AnvilMenu::handleEditNamePressed()
 {
 	setIgnoreInput(true);
-#if defined(__PS3__) || defined(__ORBIS__) || defined __PSVITA__
+#ifdef _WINDOWS64
+	Win64InGameKeyboard::Request(app.GetString(IDS_TITLE_RENAME), m_textInputAnvil.getLabel(), (DWORD)m_iPad, 30, &UIScene_AnvilMenu::KeyboardCompleteCallback, this, C_4JInput::EKeyboardMode_Default);
+#elif defined(__PS3__) || defined(__ORBIS__) || defined __PSVITA__
 	int language = XGetLanguage();
 	switch(language)
 	{

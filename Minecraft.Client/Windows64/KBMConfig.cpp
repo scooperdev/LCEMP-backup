@@ -6,9 +6,64 @@
 #include <cstdio>
 #include <cstring>
 #include <cctype>
+#include <cstdlib>
+#if defined(__linux__)
+#include <unistd.h>
+#endif
 
 static KBMConfig s_config;
 static bool s_loaded = false;
+static void WriteDefaultINI(const char* path);
+
+static bool BuildAppDataINIPath(char* outPath, size_t outSize)
+{
+	if (!outPath || outSize == 0) return false;
+
+	char dirPath[MAX_PATH];
+	int written = 0;
+#if defined(__linux__)
+	const char* baseDir = getenv("XDG_DATA_HOME");
+	if (baseDir != NULL && baseDir[0] != 0)
+	{
+		written = snprintf(dirPath, MAX_PATH, "%s/minecraft", baseDir);
+	}
+	else
+	{
+		baseDir = getenv("HOME");
+		if (baseDir == NULL || baseDir[0] == 0) return false;
+		written = snprintf(dirPath, MAX_PATH, "%s/.minecraft", baseDir);
+	}
+#else
+	const char* baseDir = getenv("APPDATA");
+	if (baseDir == NULL || baseDir[0] == 0) return false;
+	written = _snprintf_s(dirPath, MAX_PATH, _TRUNCATE, "%s\\Minecraft", baseDir);
+#endif
+	if (written <= 0 || written >= MAX_PATH) return false;
+
+	CreateDirectoryA(dirPath, NULL);
+
+	#if defined(__linux__)
+	written = snprintf(outPath, outSize, "%s/kbm_config.ini", dirPath);
+	#else
+	written = _snprintf_s(outPath, outSize, _TRUNCATE, "%s\\kbm_config.ini", dirPath);
+	#endif
+	if (written <= 0 || (size_t)written >= outSize) return false;
+	return true;
+}
+
+static FILE* OpenINIWithCreate(const char* path)
+{
+	if (!path || !path[0]) return NULL;
+
+	FILE* f = fopen(path, "r");
+	if (!f)
+	{
+		WriteDefaultINI(path);
+		f = fopen(path, "r");
+	}
+
+	return f;
+}
 
 static int ParseVK(const char* val)
 {
@@ -70,6 +125,7 @@ static void WriteDefaultINI(const char* path)
 	fprintf(f, "sprint=LCONTROL\n");
 	fprintf(f, "inventory=E\n");
 	fprintf(f, "drop=Q\n");
+	fprintf(f, "chat=T\n");
 	fprintf(f, "crafting=TAB\n");
 	fprintf(f, "confirm=RETURN\n");
 	fprintf(f, "pause=ESCAPE\n");
@@ -100,6 +156,7 @@ void KBMConfig::Load()
 	keySprint = VK_LCONTROL;
 	keyInventory = 'E';
 	keyDrop = 'Q';
+	keyChat = 'T';
 	keyCrafting = VK_TAB;
 	keyConfirm = VK_RETURN;
 	keyPause = VK_ESCAPE;
@@ -110,20 +167,39 @@ void KBMConfig::Load()
 	s_loaded = true;
 
 	char exePath[MAX_PATH];
+#if defined(__linux__)
+	if (getcwd(exePath, sizeof(exePath)) == NULL) return;
+	size_t exeLen = strlen(exePath);
+	if (exeLen + 1 >= MAX_PATH) return;
+	if (exeLen > 0 && exePath[exeLen - 1] != '/')
+	{
+		exePath[exeLen] = '/';
+		exePath[exeLen + 1] = 0;
+	}
+#else
 	if (!GetModuleFileNameA(NULL, exePath, MAX_PATH)) return;
 
 	char* slash = strrchr(exePath, '\\');
 	if (slash) *(slash + 1) = 0;
+#endif
 
 	char iniPath[MAX_PATH];
-	_snprintf_s(iniPath, MAX_PATH, _TRUNCATE, "%skbm_config.ini", exePath);
+	#if defined(__linux__)
+	int written = snprintf(iniPath, MAX_PATH, "%skbm_config.ini", exePath);
+	#else
+	int written = _snprintf_s(iniPath, MAX_PATH, _TRUNCATE, "%skbm_config.ini", exePath);
+	#endif
+	if (written <= 0 || written >= MAX_PATH) return;
 
-	FILE* f = fopen(iniPath, "r");
+	FILE* f = OpenINIWithCreate(iniPath);
 	if (!f)
 	{
-		WriteDefaultINI(iniPath);
-		return;
+		char appDataINIPath[MAX_PATH];
+		if (BuildAppDataINIPath(appDataINIPath, MAX_PATH))
+			f = OpenINIWithCreate(appDataINIPath);
 	}
+
+	if (!f) return;
 
 	char line[256];
 	while (fgets(line, sizeof(line), f))
@@ -160,6 +236,7 @@ void KBMConfig::Load()
 		else if (_stricmp(key, "sprint") == 0) { int v = ParseVK(val); if (v) keySprint = v; }
 		else if (_stricmp(key, "inventory") == 0) { int v = ParseVK(val); if (v) keyInventory = v; }
 		else if (_stricmp(key, "drop") == 0) { int v = ParseVK(val); if (v) keyDrop = v; }
+		else if (_stricmp(key, "chat") == 0) { int v = ParseVK(val); if (v) keyChat = v; }
 		else if (_stricmp(key, "crafting") == 0) { int v = ParseVK(val); if (v) keyCrafting = v; }
 		else if (_stricmp(key, "confirm") == 0) { int v = ParseVK(val); if (v) keyConfirm = v; }
 		else if (_stricmp(key, "pause") == 0) { int v = ParseVK(val); if (v) keyPause = v; }

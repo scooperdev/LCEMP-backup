@@ -270,7 +270,9 @@ public:
 	static C4JThread *rebuildThreads[MAX_CHUNK_REBUILD_THREADS];
 	static C4JThread::EventArray *s_rebuildCompleteEvents;
 	static C4JThread::Event *s_activationEventA[MAX_CHUNK_REBUILD_THREADS];
+	static volatile bool s_rebuildThreadsTerminate;
 	static void staticCtor();
+	static void shutdownRebuildThreads();
 	static int rebuildChunkThreadProc(LPVOID lpParam);
 
 	CRITICAL_SECTION m_csChunkFlags;

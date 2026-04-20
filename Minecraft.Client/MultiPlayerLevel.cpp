@@ -603,18 +603,19 @@ bool MultiPlayerLevel::doSetTileAndData(int x, int y, int z, int tile, int data)
 
 void MultiPlayerLevel::disconnect(bool sendDisconnect /*= true*/)
 {
+	vector<ClientConnection *> connectionsTemp = connections;
 	if( sendDisconnect )
 	{
-		for(AUTO_VAR(it, connections.begin()); it < connections.end(); ++it )
+		for(AUTO_VAR(it, connectionsTemp.begin()); it < connectionsTemp.end(); ++it )
 		{
-			(*it)->sendAndDisconnect( shared_ptr<DisconnectPacket>( new DisconnectPacket(DisconnectPacket::eDisconnect_Quitting) ) );
+			if( *it ) (*it)->sendAndDisconnect( shared_ptr<DisconnectPacket>( new DisconnectPacket(DisconnectPacket::eDisconnect_Quitting) ) );
 		}
 	}
 	else
 	{
-		for(AUTO_VAR(it, connections.begin()); it < connections.end(); ++it )
+		for(AUTO_VAR(it, connectionsTemp.begin()); it < connectionsTemp.end(); ++it )
 		{
-			(*it)->close();
+			if( *it ) (*it)->close();
 		}
 	}
 }

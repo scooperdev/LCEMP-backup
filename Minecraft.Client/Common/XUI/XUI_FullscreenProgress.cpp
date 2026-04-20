@@ -68,7 +68,43 @@ HRESULT CScene_FullscreenProgress::OnInit( XUIMessageInit* pInitData, BOOL& bHan
 HRESULT CScene_FullscreenProgress::OnDestroy()
 {
 	if( thread != NULL && thread != INVALID_HANDLE_VALUE )
-		delete thread;
+	{
+		if( !threadStarted )
+		{
+			delete thread;
+		}
+		else
+		{
+			int code = thread->GetExitCode();
+			DWORD exitcode = *((DWORD *)&code);
+
+			if( exitcode == STILL_ACTIVE && m_cancelFunc != NULL && !m_bWasCancelled )
+			{
+				m_bWasCancelled = true;
+				m_cancelFunc(m_cancelFuncParam);
+			}
+
+			if( exitcode == STILL_ACTIVE )
+			{
+				DWORD waitResult = thread->WaitForCompletion(5000);
+				if( waitResult == WAIT_TIMEOUT )
+				{
+					app.DebugPrintf("XUI_FullscreenProgress: skipping active thread delete to avoid shutdown race\n");
+					thread = NULL;
+				}
+				else
+				{
+					delete thread;
+					thread = NULL;
+				}
+			}
+			else
+			{
+				delete thread;
+				thread = NULL;
+			}
+		}
+	}
 
 	if( m_CompletionData != NULL )
 		delete m_CompletionData;

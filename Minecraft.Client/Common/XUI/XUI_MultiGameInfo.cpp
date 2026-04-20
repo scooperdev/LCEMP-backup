@@ -11,6 +11,8 @@
 
 #define UPDATE_PLAYERS_TIMER_ID 0
 #define UPDATE_PLAYERS_TIMER_TIME 30000
+#define CONNECT_POLL_TIMER_ID 1
+#define CONNECT_POLL_TIMER_TIME 100
 
 //----------------------------------------------------------------------------------
 // Performs initialization tasks - retrieves controls.
@@ -317,10 +319,14 @@ void CScene_MultiGameInfo::JoinGame(CScene_MultiGameInfo* pClass)
 	{
 		CGameNetworkManager::eJoinGameResult result = g_NetworkManager.JoinGame( pClass->m_selectedSession, dwLocalUsersMask );
 
-		// Alert the app the we no longer want to be informed of ethernet connections
 		app.SetLiveLinkRequired( false );
 
-		if( result != CGameNetworkManager::JOINGAME_SUCCESS )
+		if( result == CGameNetworkManager::JOINGAME_PENDING )
+		{
+			pClass->m_bIgnoreInput = true;
+			pClass->SetTimer(CONNECT_POLL_TIMER_ID, CONNECT_POLL_TIMER_TIME);
+		}
+		else if( result != CGameNetworkManager::JOINGAME_SUCCESS )
 		{
 			int exitReasonStringId = -1;
 			switch(result)
@@ -349,7 +355,24 @@ void CScene_MultiGameInfo::JoinGame(CScene_MultiGameInfo* pClass)
 
 HRESULT CScene_MultiGameInfo::OnTimer( XUIMessageTimer *pTimer, BOOL& bHandled )
 {
-	if ( pTimer->nId == UPDATE_PLAYERS_TIMER_ID)
+	if ( pTimer->nId == CONNECT_POLL_TIMER_ID)
+	{
+		KillTimer(CONNECT_POLL_TIMER_ID);
+		if (g_NetworkManager.IsJoinPending())
+		{
+			SetTimer(CONNECT_POLL_TIMER_ID, CONNECT_POLL_TIMER_TIME);
+		}
+		else if (!g_NetworkManager.IsInSession())
+		{
+			m_bIgnoreInput = false;
+			SetShow(TRUE);
+			UINT uiIDA[1];
+			uiIDA[0] = IDS_CONFIRM_OK;
+			StorageManager.RequestMessageBox( IDS_CONNECTION_FAILED, IDS_CONNECTION_LOST_SERVER, uiIDA,1,ProfileManager.GetPrimaryPad(),NULL,NULL, app.GetStringTable());
+			app.NavigateBack(ProfileManager.GetPrimaryPad());
+		}
+	}
+	else if ( pTimer->nId == UPDATE_PLAYERS_TIMER_ID)
 	{
 		PlayerUID selectedPlayerXUID = m_selectedSession->data.players[playersList.GetCurSel()];
 

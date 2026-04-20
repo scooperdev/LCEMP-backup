@@ -14,16 +14,13 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 #define WIN64_NET_DEFAULT_PORT 25565
-#ifdef _DEDICATED_SERVER
-#define WIN64_NET_MAX_CLIENTS 31
-#else
-#define WIN64_NET_MAX_CLIENTS 7
-#endif
-#define WIN64_NET_RECV_BUFFER_SIZE 65536
+#define WIN64_NET_RECV_BUFFER_SIZE 131072
 #define WIN64_NET_MAX_PACKET_SIZE (3 * 1024 * 1024)
 #define WIN64_LAN_DISCOVERY_PORT 25566
 #define WIN64_LAN_BROADCAST_MAGIC 0x4D434C4E
 #define WIN64_LAN_BROADCAST_PLAYERS 8
+#define WIN64_NET_SEND_BUFFER_SIZE 262144
+#define WIN64_NET_MAX_SEND_QUEUE (4 * 1024 * 1024)
 
 class Socket;
 
@@ -66,9 +63,19 @@ struct Win64RemoteConnection
 {
 	SOCKET tcpSocket;
 	BYTE smallId;
-	HANDLE recvThread;
 	volatile bool active;
 	CRITICAL_SECTION sendLock;
+
+	BYTE *recvBuffer;
+	int recvBufferUsed;
+	int recvBufferSize;
+	int currentPacketSize;
+	bool readingHeader;
+
+	BYTE *sendBuffer;
+	int sendBufferUsed;
+	int sendBufferSize;
+	CRITICAL_SECTION sendBufLock;
 };
 
 class WinsockNetLayer
@@ -79,6 +86,11 @@ public:
 
 	static bool HostGame(int port);
 	static bool JoinGame(const char *ip, int port);
+
+	enum JoinResult { JOIN_IN_PROGRESS, JOIN_SUCCESS, JOIN_FAILED };
+	static bool BeginJoinGame(const char *ip, int port);
+	static JoinResult PollJoinResult();
+	static void CancelJoinGame();
 
 	static bool SendToSmallId(BYTE targetSmallId, const void *data, int dataSize);
 	static bool SendOnSocket(SOCKET sock, const void *data, int dataSize);
@@ -95,6 +107,7 @@ public:
 
 	static void HandleDataReceived(BYTE fromSmallId, BYTE toSmallId, unsigned char *data, unsigned int dataSize);
 	static void FlushPendingData();
+	static void FlushSendBuffers();
 
 	static bool PopDisconnectedSmallId(BYTE *outSmallId);
 	static void PushFreeSmallId(BYTE smallId);
@@ -109,6 +122,7 @@ public:
 	static void UpdateAdvertisePlayerCount(BYTE count);
 	static void UpdateAdvertiseJoinable(bool joinable);
 	static void UpdateAdvertisePlayerNames(BYTE count, const char playerNames[][XUSER_NAME_SIZE]);
+	static void UpdateAdvertiseGameHostSettings(unsigned int settings);
 
 	static bool StartDiscovery();
 	static void StopDiscovery();
@@ -117,15 +131,19 @@ public:
 	static int GetHostPort() { return s_hostGamePort; }
 
 private:
+	static size_t GetConnectionSlotCount();
 	static DWORD WINAPI AcceptThreadProc(LPVOID param);
-	static DWORD WINAPI RecvThreadProc(LPVOID param);
+	static DWORD WINAPI IOThreadProc(LPVOID param);
 	static DWORD WINAPI ClientRecvThreadProc(LPVOID param);
 	static DWORD WINAPI AdvertiseThreadProc(LPVOID param);
 	static DWORD WINAPI DiscoveryThreadProc(LPVOID param);
+	static DWORD WINAPI AsyncJoinThreadProc(LPVOID param);
+	static bool ProcessRecvData(Win64RemoteConnection &conn);
 
 	static SOCKET s_listenSocket;
 	static SOCKET s_hostConnectionSocket;
 	static HANDLE s_acceptThread;
+	static HANDLE s_ioThread;
 	static HANDLE s_clientRecvThread;
 
 	static bool s_isHost;
@@ -140,7 +158,7 @@ private:
 	static CRITICAL_SECTION s_sendLock;
 	static CRITICAL_SECTION s_connectionsLock;
 
-	static Win64RemoteConnection s_connections[WIN64_NET_MAX_CLIENTS + 1];
+	static std::vector<Win64RemoteConnection> s_connections;
 
 	static SOCKET s_advertiseSock;
 	static HANDLE s_advertiseThread;
@@ -150,6 +168,7 @@ private:
 	static int s_hostGamePort;
 
 	static SOCKET s_discoverySock;
+	static SOCKET s_discoveryLegacySock;
 	static HANDLE s_discoveryThread;
 	static volatile bool s_discovering;
 	static CRITICAL_SECTION s_discoveryLock;
@@ -165,7 +184,13 @@ private:
 	static std::vector<BYTE> s_freeSmallIds;
 
 	static CRITICAL_SECTION s_earlyDataLock;
-	static std::vector<BYTE> s_earlyDataBuffers[WIN64_NET_MAX_CLIENTS + 1];
+	static std::vector<std::vector<BYTE> > s_earlyDataBuffers;
+
+	static HANDLE s_asyncJoinThread;
+	static volatile JoinResult s_asyncJoinResult;
+	static volatile bool s_asyncJoinActive;
+	static char s_asyncJoinIP[256];
+	static int s_asyncJoinPort;
 };
 
 extern bool g_Win64MultiplayerHost;

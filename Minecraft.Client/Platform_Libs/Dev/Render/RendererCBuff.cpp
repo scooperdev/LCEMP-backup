@@ -292,17 +292,25 @@ void Renderer::CommandBuffer::Render(C4JRender::eVertexType vType, Renderer::Con
                     command.add_matrix.m_matrix[12], command.add_matrix.m_matrix[13],
                     command.add_matrix.m_matrix[14], command.add_matrix.m_matrix[15]
                 };
-                D3D11_MAPPED_SUBRESOURCE mappedAux0 = {};
-                c.m_pDeviceContext->Map(c.m_compressedTranslationBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedAux0);
-                memcpy(mappedAux0.pData, row, sizeof(row));
-                c.m_pDeviceContext->Unmap(c.m_compressedTranslationBuffer, 0);
+                if (memcmp(row, c.m_cachedCompressedTranslation, sizeof(row)) != 0)
+                {
+                    memcpy(c.m_cachedCompressedTranslation, row, sizeof(row));
+                    D3D11_MAPPED_SUBRESOURCE mappedAux0 = {};
+                    c.m_pDeviceContext->Map(c.m_compressedTranslationBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedAux0);
+                    memcpy(mappedAux0.pData, row, sizeof(row));
+                    c.m_pDeviceContext->Unmap(c.m_compressedTranslationBuffer, 0);
+                }
             }
             else
             {
-                D3D11_MAPPED_SUBRESOURCE mappedMatrix1 = {};
-                c.m_pDeviceContext->Map(c.m_localTransformMatrix, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedMatrix1);
-                memcpy(mappedMatrix1.pData, command.add_matrix.m_matrix, sizeof(command.add_matrix.m_matrix));
-                c.m_pDeviceContext->Unmap(c.m_localTransformMatrix, 0);
+                if (memcmp(command.add_matrix.m_matrix, c.m_cachedLocalMatrix, sizeof(c.m_cachedLocalMatrix)) != 0)
+                {
+                    memcpy(c.m_cachedLocalMatrix, command.add_matrix.m_matrix, sizeof(c.m_cachedLocalMatrix));
+                    D3D11_MAPPED_SUBRESOURCE mappedMatrix1 = {};
+                    c.m_pDeviceContext->Map(c.m_localTransformMatrix, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedMatrix1);
+                    memcpy(mappedMatrix1.pData, command.add_matrix.m_matrix, sizeof(command.add_matrix.m_matrix));
+                    c.m_pDeviceContext->Unmap(c.m_localTransformMatrix, 0);
+                }
                 matrixOverride = true;
             }
             break;
@@ -311,7 +319,8 @@ void Renderer::CommandBuffer::Render(C4JRender::eVertexType vType, Renderer::Con
         {
             if (isActive)
             {
-                InternalRenderManager.UpdateLightingState();
+                if (c.lightingDirty && c.lightingEnabled)
+                    InternalRenderManager.UpdateLightingState();
 
                 if (drawVertexType == C4JRender::VERTEX_TYPE_PF3_TF2_CB4_NB4_XW1)
                 {
@@ -369,10 +378,14 @@ void Renderer::CommandBuffer::Render(C4JRender::eVertexType vType, Renderer::Con
         }
         case COMMAND_SET_COLOR:
         {
-            D3D11_MAPPED_SUBRESOURCE mappedColour = {};
-            c.m_pDeviceContext->Map(c.m_tintColorBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedColour);
-            memcpy(mappedColour.pData, command.set_color.m_color, sizeof(command.set_color.m_color));
-            c.m_pDeviceContext->Unmap(c.m_tintColorBuffer, 0);
+            if (memcmp(command.set_color.m_color, c.m_cachedTintColor, sizeof(c.m_cachedTintColor)) != 0)
+            {
+                memcpy(c.m_cachedTintColor, command.set_color.m_color, sizeof(c.m_cachedTintColor));
+                D3D11_MAPPED_SUBRESOURCE mappedColour = {};
+                c.m_pDeviceContext->Map(c.m_tintColorBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedColour);
+                memcpy(mappedColour.pData, command.set_color.m_color, sizeof(command.set_color.m_color));
+                c.m_pDeviceContext->Unmap(c.m_tintColorBuffer, 0);
+            }
             break;
         }
         case COMMAND_SET_DEPTH_FUNC:
@@ -486,6 +499,7 @@ void Renderer::CommandBuffer::Render(C4JRender::eVertexType vType, Renderer::Con
         c.m_pDeviceContext->Map(c.m_localTransformMatrix, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedIdentity);
         memcpy(mappedIdentity.pData, &identity, sizeof(identity));
         c.m_pDeviceContext->Unmap(c.m_localTransformMatrix, 0);
+        memcpy(c.m_cachedLocalMatrix, &identity, sizeof(identity));
     }
 }
 

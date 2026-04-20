@@ -33,6 +33,7 @@ private:
 	int sizeDelta;
 	__int64 _lastModified;
 	bool m_bIsEmpty;			// 4J added
+	CRITICAL_SECTION m_cs;
 
 public:
     RegionFile(ConsoleSaveFile *saveFile, File *path);

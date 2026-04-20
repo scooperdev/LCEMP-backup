@@ -46,7 +46,8 @@ public:
 	{
 		JOINGAME_SUCCESS,
 		JOINGAME_FAIL_GENERAL,
-		JOINGAME_FAIL_SERVER_FULL
+		JOINGAME_FAIL_SERVER_FULL,
+		JOINGAME_PENDING
 	} eJoinGameResult;
 
 	void			Initialise();
@@ -103,7 +104,8 @@ public:
 	// Session joining and leaving
 
 	bool			JoinGameFromInviteInfo( int userIndex, int userMask, const INVITE_INFO *pInviteInfo);
-	eJoinGameResult	JoinGame(FriendSessionInfo *searchResult, int localUsersMask);	
+	eJoinGameResult	JoinGame(FriendSessionInfo *searchResult, int localUsersMask);
+	bool			IsJoinPending();
 	static void		CancelJoinGame(LPVOID lpParam); // Not part of the shared interface
 	bool			LeaveGame(bool bMigrateHost);
 	static int		JoinFromInvite_SignInReturned(void *pParam,bool bContinue, int iPad);

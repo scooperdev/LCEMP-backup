@@ -407,6 +407,12 @@ public:
         D3D11_DEPTH_STENCIL_DESC depthStencilDesc;
         D3D11_RASTERIZER_DESC rasterizerDesc;
         float blendFactor[4];
+        float m_cachedLocalMatrix[16];
+        float m_cachedCompressedTranslation[4];
+        float m_cachedTintColor[4];
+        bool fogDirty;
+        bool texGenDirty;
+        int m_cachedSamplerKey;
     };
 
     static DWORD tlsIdx;

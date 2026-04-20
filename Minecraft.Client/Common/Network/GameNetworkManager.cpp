@@ -34,6 +34,7 @@
 #include "Common/UI/UI.h"
 #include "Common/UI/UIScene_PauseMenu.h"
 #include "../../Xbox/Network/NetworkPlayerXbox.h"
+#include "PlatformNetworkManagerStub.h"
 #endif
 
 #ifdef _DURANGO
@@ -84,6 +85,9 @@ void CGameNetworkManager::Terminate()
 	if( m_bInitialised )
 	{
 		s_pPlatformNetworkManager->Terminate();
+		delete s_pPlatformNetworkManager;
+		s_pPlatformNetworkManager = NULL;
+		m_bInitialised = false;
 	}
 }
 
@@ -680,6 +684,16 @@ void CGameNetworkManager::CancelJoinGame(LPVOID lpParam)
 #endif
 }
 
+bool CGameNetworkManager::IsJoinPending()
+{
+#ifdef _WINDOWS64
+	CPlatformNetworkManagerStub *stub = (CPlatformNetworkManagerStub *)s_pPlatformNetworkManager;
+	return stub->IsJoinPending();
+#else
+	return false;
+#endif
+}
+
 bool CGameNetworkManager::LeaveGame(bool bMigrateHost)
 {
 	Minecraft::GetInstance()->gui->clearMessages();
@@ -883,7 +897,11 @@ int CGameNetworkManager::ServerThreadProc( void* lpParameter )
 	IntCache::ReleaseThreadStorage();
 	Level::destroyLightingCache();
 
-	if(lpParameter != NULL) delete lpParameter;
+	if (lpParameter != NULL)
+	{
+		NetworkGameInitData *param = (NetworkGameInitData *)lpParameter;
+		delete param;
+	}
 
 	return S_OK;
 }

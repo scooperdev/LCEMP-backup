@@ -26,6 +26,14 @@ SOFTWARE.
 #include "Renderer.h"
 #include "CompiledShaders.h"
 
+#ifndef DXGI_PRESENT_ALLOW_TEARING
+#define DXGI_PRESENT_ALLOW_TEARING 0x00000200
+#endif
+
+#ifndef DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
+#define DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING 2048
+#endif
+
 Renderer InternalRenderManager;
 
 DWORD Renderer::tlsIdx = TlsAlloc();
@@ -131,6 +139,19 @@ Renderer::Context::Context(ID3D11Device* device, ID3D11DeviceContext* deviceCont
         matrixStacks[i][0] = identity;
         stackPos[i] = 0;
     }
+
+    memcpy(m_cachedLocalMatrix, &identity, sizeof(m_cachedLocalMatrix));
+    m_cachedCompressedTranslation[0] = 0.0f;
+    m_cachedCompressedTranslation[1] = 0.0f;
+    m_cachedCompressedTranslation[2] = 0.0f;
+    m_cachedCompressedTranslation[3] = 0.0f;
+    m_cachedTintColor[0] = 1.0f;
+    m_cachedTintColor[1] = 1.0f;
+    m_cachedTintColor[2] = 1.0f;
+    m_cachedTintColor[3] = 1.0f;
+    fogDirty = true;
+    texGenDirty = true;
+    m_cachedSamplerKey = -1;
 
     blendDesc.AlphaToCoverageEnable = false;
     blendDesc.IndependentBlendEnable = false;
@@ -667,7 +688,16 @@ void Renderer::Present()
         m_bShouldScreenGrabNextFrame = false;
     }
 
-    m_pSwapChain->Present(0, 0);
+    UINT presentFlags = 0;
+
+    if (m_pSwapChain)
+    {
+        DXGI_SWAP_CHAIN_DESC swapDesc = {};
+        if (SUCCEEDED(m_pSwapChain->GetDesc(&swapDesc)) && (swapDesc.Flags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) != 0)
+            presentFlags |= DXGI_PRESENT_ALLOW_TEARING;
+    }
+
+    m_pSwapChain->Present(0, presentFlags);
     ++presentCount;
 }
 

@@ -177,7 +177,8 @@ public:
 	static MinecraftServer *getInstance() { return server; }	// 4J added
 	static bool serverHalted() { return s_bServerHalted; }
 	static bool saveOnExitAnswered() { return s_bSaveOnExitAnswered; }
-	static void resetFlags() { s_bServerHalted = false; s_bSaveOnExitAnswered = false; }
+	static void resetFlags() { s_bServerHalted = false; s_bSaveOnExitAnswered = false; s_bDeleteCurrentSaveOnNoSaveExit = false; }
+	static void SetDeleteOnNoSaveForCurrentSession(bool bDelete) { s_bDeleteCurrentSaveOnNoSaveExit = bDelete; }
 
 	bool flagEntitiesToBeRemoved(unsigned int *flags);	// 4J added
 private:
@@ -192,6 +193,7 @@ private:
 	static bool	m_bPrimaryPlayerSignedOut;	// 4J-PB added to tell the stopserver not to save the game - another player may have signed in in their place, so ProfileManager.IsSignedIn isn't enough
 	static bool s_bServerHalted; // 4J Stu Added so that we can halt the server even before it's been created properly
 	static bool s_bSaveOnExitAnswered; // 4J Stu Added so that we only ask this question once when we exit
+	static bool s_bDeleteCurrentSaveOnNoSaveExit;
 
 	// 4J - added so that we can have a separate thread for post processing chunks on level creation
 	static int runPostUpdate(void* lpParam);

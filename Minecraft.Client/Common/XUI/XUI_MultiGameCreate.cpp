@@ -888,6 +888,7 @@ void CScene_MultiGameCreate::CreateGame(CScene_MultiGameCreate* pClass, DWORD dw
 	StorageManager.ResetSaveData();
 	// Make our next save default to the name of the level
 	StorageManager.SetSaveTitle((wchar_t *)wWorldName.c_str());
+	MinecraftServer::SetDeleteOnNoSaveForCurrentSession(true);
 
 	BOOL bHasSeed = (pClass->m_EditSeed.GetText() != NULL);
 

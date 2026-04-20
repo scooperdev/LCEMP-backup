@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "Windows64_PostProcess.h"
-#include <d3dcompiler.h>
-#pragma comment(lib, "d3dcompiler.lib")
+#include "GammaPostProcessVS.h"
+#include "GammaPostProcessPS.h"
 
 extern ID3D11Device*           g_pd3dDevice;
 extern ID3D11DeviceContext*    g_pImmediateContext;
@@ -26,28 +26,6 @@ struct GammaCBData
 	float gamma;
 	float pad[3];
 };
-
-static const char* g_gammaVSCode =
-	"void main(uint id : SV_VertexID, out float4 pos : SV_Position, out float2 uv : TEXCOORD0)\n"
-	"{\n"
-	"    uv = float2((id << 1) & 2, id & 2);\n"
-	"    pos = float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);\n"
-	"}\n";
-
-static const char* g_gammaPSCode =
-	"cbuffer GammaCB : register(b0)\n"
-	"{\n"
-	"    float gamma;\n"
-	"    float3 pad;\n"
-	"};\n"
-	"Texture2D sceneTex : register(t0);\n"
-	"SamplerState sceneSampler : register(s0);\n"
-	"float4 main(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target\n"
-	"{\n"
-	"    float4 color = sceneTex.Sample(sceneSampler, uv);\n"
-	"    color.rgb = pow(max(color.rgb, 0.0), 1.0 / gamma);\n"
-	"    return color;\n"
-	"}\n";
 
 
 void SetGammaValue(float gamma)
@@ -89,30 +67,10 @@ bool InitGammaPostProcess()
 	hr = g_pd3dDevice->CreateRenderTargetView(g_pGammaOffscreenTex, NULL, &g_pGammaOffscreenRTV);
 	if (FAILED(hr)) return false;
 
-	ID3DBlob* vsBlob = NULL;
-	ID3DBlob* errBlob = NULL;
-	hr = D3DCompile(g_gammaVSCode, strlen(g_gammaVSCode), "GammaVS", NULL, NULL, "main", "vs_4_0", 0, 0, &vsBlob, &errBlob);
-	if (FAILED(hr))
-	{
-		if (errBlob) errBlob->Release();
-		return false;
-	}
-	hr = g_pd3dDevice->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), NULL, &g_pGammaVS);
-	vsBlob->Release();
-	if (errBlob) errBlob->Release();
+	hr = g_pd3dDevice->CreateVertexShader(g_gammaPostProcessVS, sizeof(g_gammaPostProcessVS), NULL, &g_pGammaVS);
 	if (FAILED(hr)) return false;
 
-	errBlob = NULL;
-	ID3DBlob* psBlob = NULL;
-	hr = D3DCompile(g_gammaPSCode, strlen(g_gammaPSCode), "GammaPS", NULL, NULL, "main", "ps_4_0", 0, 0, &psBlob, &errBlob);
-	if (FAILED(hr))
-	{
-		if (errBlob) errBlob->Release();
-		return false;
-	}
-	hr = g_pd3dDevice->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), NULL, &g_pGammaPS);
-	psBlob->Release();
-	if (errBlob) errBlob->Release();
+	hr = g_pd3dDevice->CreatePixelShader(g_gammaPostProcessPS, sizeof(g_gammaPostProcessPS), NULL, &g_pGammaPS);
 	if (FAILED(hr)) return false;
 
 	D3D11_BUFFER_DESC cbDesc;

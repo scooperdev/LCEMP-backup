@@ -757,11 +757,17 @@ void LocalPlayer::awardStat(Stat *stat, byteArray param)
 	int count = CommonStats::readParam(param);
 	delete [] param.data;
 
-	if (!app.CanRecordStatsAndAchievements())	return;
-    if (stat == NULL)							return;
+	if (stat == NULL)							return;
+
+	const bool canRecordStatsAndAchievements = app.CanRecordStatsAndAchievements();
 
     if (stat->isAchievement())
 	{
+		if (!canRecordStatsAndAchievements)
+		{
+			return;
+		}
+
         Achievement *ach = (Achievement *) stat;
 		// 4J-PB - changed to attempt to award everytime - the award may need a storage device, so needs a primary player, and the player may not have been a primary player when they first 'got' the award
 		// so let the award manager figure it out
@@ -803,6 +809,11 @@ void LocalPlayer::awardStat(Stat *stat, byteArray param)
 		// 4J : WESTY : Added for new achievements.
 		StatsCounter* pStats = minecraft->stats[m_iPad];
         pStats->award(stat, level->difficulty, count);
+
+		if (!canRecordStatsAndAchievements)
+		{
+			return;
+		}
 
 		// 4J-JEV: Check achievements for unlocks.
 

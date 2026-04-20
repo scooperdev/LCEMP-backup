@@ -164,6 +164,11 @@ void MultiplayerLocalPlayer::reallyDrop(shared_ptr<ItemEntity> itemEntity)
 
 void MultiplayerLocalPlayer::chat(const wstring& message)
 {
+	if (app.GetGameHostOption(eGameHostOption_ChatDisabled) != 0)
+	{
+		return;
+	}
+
 	connection->send( shared_ptr<ChatPacket>( new ChatPacket(message) ) );
 }
 

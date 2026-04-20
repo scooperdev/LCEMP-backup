@@ -235,6 +235,7 @@ void Renderer::StateSetColour(float r, float g, float b, float a)
 
     ID3D11DeviceContext *d3d11 = c.m_pDeviceContext;
     const float colour[4] = {r, g, b, a};
+    memcpy(c.m_cachedTintColor, colour, sizeof(c.m_cachedTintColor));
 
     D3D11_MAPPED_SUBRESOURCE mapped = {};
     d3d11->Map(c.m_tintColorBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);

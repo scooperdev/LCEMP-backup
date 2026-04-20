@@ -177,6 +177,8 @@ bool CPlatformNetworkManagerStub::Initialise(CGameNetworkManager *pGameNetworkMa
 	m_pSearchParam = NULL;
 	m_SessionsUpdatedCallback = NULL;
 
+	m_asyncJoinPending = false;
+
 	for(unsigned int i = 0; i < XUSER_MAX_COUNT; ++i)
 	{
 		m_searchResultsCount[i] = 0;
@@ -196,6 +198,32 @@ bool CPlatformNetworkManagerStub::Initialise(CGameNetworkManager *pGameNetworkMa
 
 void CPlatformNetworkManagerStub::Terminate()
 {
+#ifdef _WINDOWS64
+	m_asyncJoinPending = false;
+	WinsockNetLayer::CancelJoinGame();
+	WinsockNetLayer::StopAdvertising();
+	WinsockNetLayer::StopDiscovery();
+	WinsockNetLayer::Shutdown();
+#endif
+
+	m_bLeavingGame = false;
+	m_bLeaveGameOnTick = false;
+	m_bHostChanged = false;
+
+	for (AUTO_VAR(it, currentNetworkPlayers.begin()); it != currentNetworkPlayers.end(); ++it)
+	{
+		delete *it;
+	}
+	currentNetworkPlayers.clear();
+	m_machineQNetPrimaryPlayers.clear();
+	SystemFlagReset();
+
+	if (m_pIQNet != NULL)
+	{
+		m_pIQNet->EndGame();
+		delete m_pIQNet;
+		m_pIQNet = NULL;
+	}
 }
 
 int CPlatformNetworkManagerStub::GetJoiningReadyPercentage()
@@ -218,6 +246,43 @@ void CPlatformNetworkManagerStub::DoWork()
 {
 #ifdef _WINDOWS64
 	extern QNET_STATE _iQNetStubState;
+
+	if (m_asyncJoinPending)
+	{
+		WinsockNetLayer::JoinResult jr = WinsockNetLayer::PollJoinResult();
+		if (jr == WinsockNetLayer::JOIN_SUCCESS)
+		{
+			m_asyncJoinPending = false;
+
+			BYTE localSmallId = WinsockNetLayer::GetLocalSmallId();
+
+			IQNet::m_player[localSmallId].m_smallId = localSmallId;
+			IQNet::m_player[localSmallId].m_isRemote = false;
+			IQNet::m_player[localSmallId].m_isHostPlayer = false;
+
+			Minecraft *pMinecraft = Minecraft::GetInstance();
+			wcscpy_s(IQNet::m_player[localSmallId].m_gamertag, 32, pMinecraft->user->name.c_str());
+			IQNet::s_playerCount = localSmallId + 1;
+
+			NotifyPlayerJoined(&IQNet::m_player[0]);
+			NotifyPlayerJoined(&IQNet::m_player[localSmallId]);
+
+			m_pGameNetworkManager->StateChange_AnyToStarting();
+
+			app.DebugPrintf("Win64 LAN: Async connect to %s:%d succeeded\n", m_asyncJoinIP, m_asyncJoinPort);
+		}
+		else if (jr == WinsockNetLayer::JOIN_FAILED)
+		{
+			m_asyncJoinPending = false;
+			app.DebugPrintf("Win64 LAN: Async connect to %s:%d failed\n", m_asyncJoinIP, m_asyncJoinPort);
+			WinsockNetLayer::CancelJoinGame();
+			m_pIQNet->EndGame();
+			extern bool g_connectedToDedicatedServer;
+			g_connectedToDedicatedServer = false;
+			m_pGameNetworkManager->StateChange_AnyToIdle();
+		}
+	}
+
 	if (_iQNetStubState == QNET_STATE_SESSION_STARTING && app.GetGameStarted())
 	{
 		_iQNetStubState = QNET_STATE_GAME_PLAY;
@@ -258,7 +323,8 @@ void CPlatformNetworkManagerStub::DoWork()
 			}
 		}
 
-		for (int i = 1; i < MINECRAFT_NET_MAX_PLAYERS; i++)
+		DWORD playerCapacity = IQNet::GetPlayerCapacity();
+		for (DWORD i = 1; i < playerCapacity; i++)
 		{
 			IQNetPlayer *qp = &IQNet::m_player[i];
 			if (qp->GetCustomDataValue() == 0)
@@ -418,7 +484,10 @@ void CPlatformNetworkManagerStub::HostGame(int localUsersMask, bool bOnlineGame,
 	_HostGame( localUsersMask, publicSlots, privateSlots );
 
 #ifdef _WINDOWS64
-	int port = WIN64_NET_DEFAULT_PORT;
+	extern int g_Win64MultiplayerPort;
+	int port = g_Win64MultiplayerPort;
+	if (port <= 0 || port > 65535)
+		port = WIN64_NET_DEFAULT_PORT;
 	if (!WinsockNetLayer::IsActive())
 		WinsockNetLayer::HostGame(port);
 
@@ -471,28 +540,23 @@ int CPlatformNetworkManagerStub::JoinGame(FriendSessionInfo *searchResult, int l
 
 	WinsockNetLayer::StopDiscovery();
 
-	if (!WinsockNetLayer::JoinGame(hostIP, hostPort))
+	strncpy_s(m_asyncJoinIP, sizeof(m_asyncJoinIP), hostIP, _TRUNCATE);
+	m_asyncJoinPort = hostPort;
+	wcsncpy_s(m_asyncJoinHostName, 32, searchResult->data.hostName, _TRUNCATE);
+	m_asyncJoinIsDedicated = searchResult->data.isDedicatedServer;
+
+	if (!WinsockNetLayer::BeginJoinGame(hostIP, hostPort))
 	{
-		app.DebugPrintf("Win64 LAN: Failed to connect to %s:%d\n", hostIP, hostPort);
+		app.DebugPrintf("Win64 LAN: Failed to start async connect to %s:%d\n", hostIP, hostPort);
+		WinsockNetLayer::CancelJoinGame();
+		m_pIQNet->EndGame();
+		g_connectedToDedicatedServer = false;
+		m_pGameNetworkManager->StateChange_AnyToIdle();
 		return CGameNetworkManager::JOINGAME_FAIL_GENERAL;
 	}
 
-	BYTE localSmallId = WinsockNetLayer::GetLocalSmallId();
-
-	IQNet::m_player[localSmallId].m_smallId = localSmallId;
-	IQNet::m_player[localSmallId].m_isRemote = false;
-	IQNet::m_player[localSmallId].m_isHostPlayer = false;
-
-	Minecraft *pMinecraft = Minecraft::GetInstance();
-	wcscpy_s(IQNet::m_player[localSmallId].m_gamertag, 32, pMinecraft->user->name.c_str());
-	IQNet::s_playerCount = localSmallId + 1;
-
-	NotifyPlayerJoined(&IQNet::m_player[0]);
-	NotifyPlayerJoined(&IQNet::m_player[localSmallId]);
-
-	m_pGameNetworkManager->StateChange_AnyToStarting();
-
-	return CGameNetworkManager::JOINGAME_SUCCESS;
+	m_asyncJoinPending = true;
+	return CGameNetworkManager::JOINGAME_PENDING;
 #else
 	return CGameNetworkManager::JOINGAME_SUCCESS;
 #endif
@@ -767,8 +831,7 @@ void CPlatformNetworkManagerStub::SearchForGames()
 		bool alreadyPresent = false;
 		for (size_t i = 0; i < lanSessions.size(); i++)
 		{
-			if (strcmp(lanSessions[i].hostIP, g_Win64MultiplayerIP) == 0 &&
-				lanSessions[i].hostPort == g_Win64MultiplayerPort)
+			if (_stricmp(lanSessions[i].hostIP, g_Win64MultiplayerIP) == 0 && lanSessions[i].hostPort == g_Win64MultiplayerPort)
 			{
 				alreadyPresent = true;
 				break;
@@ -789,16 +852,82 @@ void CPlatformNetworkManagerStub::SearchForGames()
 		}
 	}
 
+	const int profilePad = ProfileManager.GetPrimaryPad();
+	const int savedServerCount = app.GetSavedServerCount(profilePad);
+	for (int i = 0; i < savedServerCount; ++i)
+	{
+		char savedName[WIN64_SAVED_SERVER_NAME_CHARS] = {0};
+		char savedHost[WIN64_SAVED_SERVER_HOST_CHARS] = {0};
+		unsigned short savedPort = WIN64_NET_DEFAULT_PORT;
+		if (!app.GetSavedServer(profilePad, i, savedName, WIN64_SAVED_SERVER_NAME_CHARS, savedHost, WIN64_SAVED_SERVER_HOST_CHARS, &savedPort))
+			continue;
+
+		if (savedHost[0] == '\0')
+			continue;
+
+		if (savedPort == 0)
+			savedPort = WIN64_NET_DEFAULT_PORT;
+
+		bool alreadyPresent = false;
+		for (size_t n = 0; n < lanSessions.size(); ++n)
+		{
+			if (_stricmp(lanSessions[n].hostIP, savedHost) == 0 && lanSessions[n].hostPort == (int)savedPort)
+			{
+				alreadyPresent = true;
+				break;
+			}
+		}
+
+		if (alreadyPresent)
+			continue;
+
+		Win64LANSession saved;
+		memset(&saved, 0, sizeof(saved));
+		strncpy_s(saved.hostIP, sizeof(saved.hostIP), savedHost, _TRUNCATE);
+		saved.hostPort = (int)savedPort;
+		if (savedName[0] != '\0')
+		{
+		#if defined(__linux__) || !defined(_MSC_VER)
+			size_t converted = mbstowcs(saved.hostName, savedName, 31);
+			if (converted == (size_t)-1)
+				saved.hostName[0] = L'\0';
+			else
+				saved.hostName[31] = L'\0';
+		#else
+			size_t converted = 0;
+			mbstowcs_s(&converted, saved.hostName, 32, savedName, _TRUNCATE);
+		#endif
+		}
+		if (saved.hostName[0] == L'\0')
+		{
+			swprintf_s(saved.hostName, 32, L"%hs:%d", savedHost, (int)savedPort);
+		}
+		saved.playerCount = 0;
+		saved.maxPlayers = MINECRAFT_NET_MAX_PLAYERS;
+		saved.isJoinable = true;
+		saved.isDedicatedServer = true;
+		saved.lastSeenTick = GetTickCount();
+		lanSessions.push_back(saved);
+	}
+
 	for (size_t i = 0; i < friendsSessions[0].size(); i++)
 		delete friendsSessions[0][i];
 	friendsSessions[0].clear();
 
 	for (size_t i = 0; i < lanSessions.size(); i++)
 	{
+		wchar_t fallbackHostName[64];
+		const wchar_t *resolvedHostName = lanSessions[i].hostName;
+		if (resolvedHostName[0] == L'\0')
+		{
+			swprintf_s(fallbackHostName, 64, L"%hs:%d", lanSessions[i].hostIP, lanSessions[i].hostPort);
+			resolvedHostName = fallbackHostName;
+		}
+
 		FriendSessionInfo *info = new FriendSessionInfo();
-		size_t nameLen = wcslen(lanSessions[i].hostName);
+		size_t nameLen = wcslen(resolvedHostName);
 		info->displayLabel = new wchar_t[nameLen + 1];
-		wcscpy_s(info->displayLabel, nameLen + 1, lanSessions[i].hostName);
+		wcscpy_s(info->displayLabel, nameLen + 1, resolvedHostName);
 		info->displayLabelLength = (unsigned char)nameLen;
 		info->displayLabelViewableStartIndex = 0;
 
@@ -811,7 +940,7 @@ void CPlatformNetworkManagerStub::SearchForGames()
 		info->data.isDedicatedServer = lanSessions[i].isDedicatedServer;
 		strncpy_s(info->data.hostIP, sizeof(info->data.hostIP), lanSessions[i].hostIP, _TRUNCATE);
 		info->data.hostPort = lanSessions[i].hostPort;
-		wcsncpy_s(info->data.hostName, XUSER_NAME_SIZE, lanSessions[i].hostName, _TRUNCATE);
+		wcsncpy_s(info->data.hostName, XUSER_NAME_SIZE, resolvedHostName, _TRUNCATE);
 		info->data.playerCount = lanSessions[i].playerCount;
 		info->data.maxPlayers = lanSessions[i].maxPlayers;
 

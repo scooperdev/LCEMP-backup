@@ -26,6 +26,30 @@ typedef struct
 }
 NOTIFICATION,*PNOTIFICATION;
 
+static const unsigned char WIN64_SAVED_SERVER_FILE_VERSION = 1;
+static const int WIN64_SAVED_SERVER_MAX = 64;
+static const int WIN64_SAVED_SERVER_NAME_CHARS = 20;
+static const int WIN64_SAVED_SERVER_HOST_CHARS = 64;
+
+typedef struct
+{
+	char szName[WIN64_SAVED_SERVER_NAME_CHARS];
+	char szHost[WIN64_SAVED_SERVER_HOST_CHARS];
+	unsigned short usPort;
+	unsigned char ucInUse;
+	unsigned char ucReserved;
+}
+WIN64_SAVED_SERVER_ENTRY;
+
+typedef struct
+{
+	unsigned char ucVersion;
+	unsigned char ucCount;
+	unsigned short usReserved;
+	WIN64_SAVED_SERVER_ENTRY entries[WIN64_SAVED_SERVER_MAX];
+}
+WIN64_SAVED_SERVER_DATA;
+
 typedef struct  
 {
 	bool bSettingsChanged;

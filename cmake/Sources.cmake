@@ -443,6 +443,7 @@ set(MINECRAFT_CLIENT_SOURCES
         "Windows64/Windows64_App.cpp"
         "Windows64/Windows64_Minecraft.cpp"
         "Windows64/Network/WinsockNetLayer.cpp"
+        "../Minecraft.Server/Core/ServerThreadPool.cpp"
         "Windows64/Audio/VoiceChat.cpp"
         "Windows64/KBMConfig.cpp"
         "KeyboardMouseInput.cpp"

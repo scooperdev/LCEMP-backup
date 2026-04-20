@@ -21,6 +21,7 @@ public:
 	static int KEY_SPRINT;
 	static int KEY_INVENTORY;
 	static int KEY_DROP;
+	static int KEY_CHAT;
 	static int KEY_CRAFTING;
 	static const int KEY_CRAFTING_ALT = 'R';
 	static int KEY_CONFIRM;
@@ -59,6 +60,7 @@ public:
 	bool HadRawMouseInput() const { return m_hadRawMouseInput; }
 
 	int GetMouseWheel() const { return m_mouseWheel; }
+	int ConsumeMouseWheel() { int wheel = m_mouseWheel; m_mouseWheel = 0; return wheel; }
 
 	void SetMouseGrabbed(bool grabbed);
 	bool IsMouseGrabbed() const { return m_mouseGrabbed; }
@@ -114,6 +116,7 @@ private:
 
 	int m_mouseWheel;
 	int m_mouseWheelAccum;
+	int m_mouseWheelRemainder;
 
 	bool m_mouseGrabbed;
 

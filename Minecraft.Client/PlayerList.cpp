@@ -133,11 +133,14 @@ void PlayerList::placeNewPlayer(Connection *connection, shared_ptr<ServerPlayer>
 
 		DWORD playerIndex = 0;
 		{
-			bool usedIndexes[32];
-			ZeroMemory( &usedIndexes, 32 * sizeof(bool) );
+			vector<char> usedIndexes(maxPlayers, 0);
 			for(AUTO_VAR(it, players.begin()); it < players.end(); ++it)
 			{
-				usedIndexes[ (int)(*it)->getPlayerIndex() ] = true;
+				int existingIndex = (int)(*it)->getPlayerIndex();
+				if (existingIndex >= 0 && existingIndex < (int)usedIndexes.size())
+				{
+					usedIndexes[existingIndex] = 1;
+				}
 			}
 			for(unsigned int i = 0; i < (unsigned int)maxPlayers; ++i)
 			{

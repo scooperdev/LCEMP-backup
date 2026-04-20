@@ -30,7 +30,7 @@ const int MINECRAFT_NET_MAX_PLAYERS = 4;
 const int XUSER_MAX_COUNT = 4;
 #endif
 #if defined(_DEDICATED_SERVER) || defined(_WINDOWS64)
-const int MINECRAFT_NET_MAX_PLAYERS = 32;
+const int MINECRAFT_NET_MAX_PLAYERS = 255;
 #else
 const int MINECRAFT_NET_MAX_PLAYERS = 8;
 #endif
@@ -332,8 +332,11 @@ public:
 	void HostGame();
 	void ClientJoinGame();
 	void EndGame();
+    static void SetPlayerCapacity(DWORD capacity);
+    static DWORD GetPlayerCapacity();
 
-	static IQNetPlayer m_player[MINECRAFT_NET_MAX_PLAYERS];
+    static IQNetPlayer *m_player;
+    static DWORD s_playerCapacity;
 	static DWORD s_playerCount;
 	static bool s_isHosting;
 };

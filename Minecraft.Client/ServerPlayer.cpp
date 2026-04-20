@@ -306,10 +306,38 @@ void ServerPlayer::doTickA()
 // 4J - split off the chunk sending bit of the tick here from ::doTick so we can do this exactly once per player per server tick
 void ServerPlayer::doChunkSendingTick(bool dontDelayChunks)
 {
-#ifdef _WINDOWS64
-	for (int _w64cs = 0; _w64cs < 4; _w64cs++)
+	int chunkSendPasses = 1;
+
+#if defined(_DEDICATED_SERVER)
+	int activePlayers = 1;
+	if (server != NULL && server->getPlayers() != NULL)
 	{
+		ServerLevel *serverLevel = server->getLevel(dimension);
+		if (serverLevel != NULL)
+		{
+			activePlayers = server->getPlayers()->getPlayerCount(serverLevel);
+		}
+	}
+	if (activePlayers < 1)
+	{
+		activePlayers = 1;
+	}
+
+	chunkSendPasses = 32 / activePlayers;
+	if (chunkSendPasses < 1)
+	{
+		chunkSendPasses = 1;
+	}
+	if (chunkSendPasses > 4)
+	{
+		chunkSendPasses = 4;
+	}
+#elif defined(_WINDOWS64)
+	chunkSendPasses = 4;
 #endif
+
+	for (int _w64cs = 0; _w64cs < chunkSendPasses; _w64cs++)
+	{
 //	printf("[%d] %s: sendChunks: %d, empty: %d\n",tickCount, connection->getNetworkPlayer()->GetUID().getOnlineID(),sendChunks,chunksToSend.empty());
 	if (!chunksToSend.empty())
 	{
@@ -469,9 +497,7 @@ void ServerPlayer::doChunkSendingTick(bool dontDelayChunks)
             }
         }
     }
-#ifdef _WINDOWS64
 	}
-#endif
 }
 
 void ServerPlayer::doTickB(bool ignorePortal)

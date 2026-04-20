@@ -46,10 +46,12 @@ public:
     bool GetSaveUniqueFilename(char *pszName);
     void SetSaveTitle(LPCWSTR pwchDefaultSaveName);
     PVOID AllocateSaveData(unsigned int uiBytes);
+    void SetSaveDataSize(unsigned int uiBytes);
     void SetSaveImages(PBYTE pbThumbnail, DWORD dwThumbnailBytes, PBYTE pbImage, DWORD dwImageBytes, PBYTE pbTextData, DWORD dwTextDataBytes);
     C4JStorage::ESaveGameState SaveSaveData(int (*Func)(LPVOID, const bool), LPVOID lpParam);
     void CopySaveDataToNewSave(PBYTE pbThumbnail, DWORD cbThumbnail, WCHAR *wchNewName, int (*Func)(LPVOID lpParam, bool), LPVOID lpParam);
     C4JStorage::ESaveGameState DeleteSaveData(PSAVE_INFO pSaveInfo, int (*Func)(LPVOID lpParam, const bool), LPVOID lpParam);
+    bool DeleteCurrentSaveData();
     C4JStorage::ESaveGameState RenameSaveData(int iRenameIndex, uint16_t *pui16NewName, int (*Func)(LPVOID lpParam, const bool), LPVOID lpParam);
     C4JStorage::ESaveGameState DoesSaveExist(bool *pbExists);
     void SetSaveUniqueFilename(char *szFilename);

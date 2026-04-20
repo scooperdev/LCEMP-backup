@@ -10,6 +10,7 @@ byteArray RegionFile::emptySector(SECTOR_BYTES);
 
 RegionFile::RegionFile(ConsoleSaveFile *saveFile, File *path)
 {
+	InitializeCriticalSectionAndSpinCount(&m_cs, 4000);
 	_lastModified = 0;
 
 	m_saveFile = saveFile;
@@ -136,11 +137,11 @@ RegionFile::RegionFile(ConsoleSaveFile *saveFile, File *path)
 //    }
 }
 
-void RegionFile::writeAllOffsets() // used for the file ConsoleSaveFile conversion between platforms
+void RegionFile::writeAllOffsets()
 {
 	if(m_bIsEmpty == false) 
 	{
-		// save all the offsets and timestamps
+		EnterCriticalSection(&m_cs);
 		m_saveFile->LockSaveAccess();
 
 		DWORD numberOfBytesWritten = 0;
@@ -152,6 +153,7 @@ void RegionFile::writeAllOffsets() // used for the file ConsoleSaveFile conversi
 		m_saveFile->writeFile(fileEntry, chunkTimestamps, SECTOR_BYTES, &numberOfBytesWritten);
 
 		m_saveFile->ReleaseSaveAccess();
+		LeaveCriticalSection(&m_cs);
 	}
 
 }
@@ -161,6 +163,7 @@ RegionFile::~RegionFile()
 	delete[] chunkTimestamps;
 	delete sectorFree;
 	m_saveFile->closeHandle( fileEntry );
+	DeleteCriticalSection(&m_cs);
 }
 
 __int64 RegionFile::lastModified()
@@ -168,27 +171,28 @@ __int64 RegionFile::lastModified()
 	return _lastModified;
 }
 
-int RegionFile::getSizeDelta()   // TODO - was synchronized
+int RegionFile::getSizeDelta()
 {
+	EnterCriticalSection(&m_cs);
 	int ret = sizeDelta;
 	sizeDelta = 0;
+	LeaveCriticalSection(&m_cs);
 	return ret;
 }
 
-DataInputStream *RegionFile::getChunkDataInputStream(int x, int z) // TODO - was synchronized
+DataInputStream *RegionFile::getChunkDataInputStream(int x, int z)
 {
 	if (outOfBounds(x, z))
 	{
-//        debugln("READ", x, z, "out of bounds");
 		return NULL;
 	}
 
-	// 4J - removed try/catch
-//    try {
+	EnterCriticalSection(&m_cs);
+
 	int offset = getOffset(x, z);
 	if (offset == 0)
 	{
-		// debugln("READ", x, z, "miss");
+		LeaveCriticalSection(&m_cs);
 		return NULL;
 	}
 
@@ -197,13 +201,12 @@ DataInputStream *RegionFile::getChunkDataInputStream(int x, int z) // TODO - was
 
 	if (sectorNumber + numSectors > sectorFree->size())
 	{
-//        debugln("READ", x, z, "invalid sector");
+		LeaveCriticalSection(&m_cs);
 		return NULL;
 	}
 
 	m_saveFile->LockSaveAccess();
 
-	//SetFilePointer(file,sectorNumber * SECTOR_BYTES,0,FILE_BEGIN);	
 	m_saveFile->setFilePointer( fileEntry, sectorNumber * SECTOR_BYTES, NULL, FILE_BEGIN);
 	
 	unsigned int length;
@@ -212,13 +215,10 @@ DataInputStream *RegionFile::getChunkDataInputStream(int x, int z) // TODO - was
 
 	DWORD numberOfBytesRead = 0;
 
-	// 4J - this differs a bit from the java file format. Java has length stored as an int, then a type as a byte, then length-1 bytes of data
-	// We store length and decompression length as ints, then length bytes of xbox LZX compressed data
 	m_saveFile->readFile(fileEntry,&length,4,&numberOfBytesRead);
 
 	if(m_saveFile->isSaveEndianDifferent()) System::ReverseULONG(&length);
 
-	// Using to bit of length to signify that this data was compressed with RLE method
 	bool useRLE = false;
 	if( length & 0x80000000 )
 	{
@@ -231,9 +231,8 @@ DataInputStream *RegionFile::getChunkDataInputStream(int x, int z) // TODO - was
 
 	if (length > SECTOR_BYTES * numSectors)
 	{
-//        debugln("READ", x, z, "invalid length: " + length + " > 4096 * " + numSectors);
-		
 		m_saveFile->ReleaseSaveAccess();
+		LeaveCriticalSection(&m_cs);
 		return NULL;
 	}
 
@@ -245,8 +244,9 @@ DataInputStream *RegionFile::getChunkDataInputStream(int x, int z) // TODO - was
 	m_saveFile->readFile(fileEntry,data,length,&numberOfBytesRead);
 
 	m_saveFile->ReleaseSaveAccess();
+	LeaveCriticalSection(&m_cs);
 
-	Compression::getCompression()->SetDecompressionType(m_saveFile->getSavePlatform()); // if this save is from another platform, set the correct decompression type
+	Compression::getCompression()->SetDecompressionType(m_saveFile->getSavePlatform());
 
 	if( useRLE )
 	{
@@ -257,18 +257,12 @@ DataInputStream *RegionFile::getChunkDataInputStream(int x, int z) // TODO - was
 		Compression::getCompression()->Decompress(decomp, &readDecompLength, data, length );
 	}
 
-	Compression::getCompression()->SetDecompressionType(SAVE_FILE_PLATFORM_LOCAL); // and then set the decompression back to the local machine's standard type
+	Compression::getCompression()->SetDecompressionType(SAVE_FILE_PLATFORM_LOCAL);
 
 	delete [] data;
 
-	// 4J - was InflaterInputStream in here too, but we've already decompressed
 	DataInputStream *ret = new DataInputStream(new ByteArrayInputStream( byteArray( decomp, readDecompLength) )); 
 	return ret;
-
-//    } catch (IOException e) {
-//        debugln("READ", x, z, "exception");
-//        return null;
-//    }
 }
 
 DataOutputStream *RegionFile::getChunkDataOutputStream(int x, int z)
@@ -278,23 +272,20 @@ DataOutputStream *RegionFile::getChunkDataOutputStream(int x, int z)
 }
 
 /* write a chunk at (x,z) with length bytes of data to disk */
-void RegionFile::write(int x, int z, byte *data, int length)		// TODO - was synchronized
+void RegionFile::write(int x, int z, byte *data, int length)
 {
-	// 4J Stu - Do the compression here so that we know how much space we need to store the compressed data
-	byte *compData = new byte[length + 2048];	// presuming compression is going to make this smaller...	UPDATE - for some really small things this isn't the case. Added 2K on here to cover those.
+	byte *compData = new byte[length + 2048];
 	unsigned int compLength = length;
 	Compression::getCompression()->CompressLZXRLE(compData,&compLength,data,length);
 
 	int sectorsNeeded = (compLength + CHUNK_HEADER_SIZE) / SECTOR_BYTES + 1;
 
-//	app.DebugPrintf(">>>>>>>>>>>>>> writing compressed data for 0x%.8x, %d %d\n",fileEntry->data.regionIndex,x,z);
-
-	// maximum chunk size is 1MB
 	if (sectorsNeeded >= 256)
 	{
 		return;
 	}
 
+	EnterCriticalSection(&m_cs);
 	m_saveFile->LockSaveAccess();
 	{
 		int offset = getOffset(x, z);
@@ -401,10 +392,7 @@ void RegionFile::write(int x, int z, byte *data, int length)		// TODO - was sync
 		setTimestamp(x, z, (int) (System::currentTimeMillis() / 1000L));
 	}
 	m_saveFile->ReleaseSaveAccess();
-
-//    } catch (IOException e) {
-//        e.printStackTrace();
-//    }
+	LeaveCriticalSection(&m_cs);
 }
 
 /* write a chunk data to the region file at specified sector number */

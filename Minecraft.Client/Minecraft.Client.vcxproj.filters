@@ -4104,6 +4104,9 @@
     <ClCompile Include="MinecraftServer.cpp">
       <Filter>net\minecraft\server</Filter>
     </ClCompile>
+    <ClCompile Include="..\Minecraft.Server\Core\ServerThreadPool.cpp">
+      <Filter>net\minecraft\server</Filter>
+    </ClCompile>
     <ClCompile Include="ServerChunkCache.cpp">
       <Filter>net\minecraft\server\level</Filter>
     </ClCompile>

@@ -848,6 +848,7 @@ bool ServerChunkCache::save(bool force, ProgressListener *progressListener)
 			LeaveCriticalSection(&m_csLoadCreate);
 			return true;
 		}
+		storage->WaitForAll();
         storage->flush();
     }
 

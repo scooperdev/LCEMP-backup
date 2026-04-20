@@ -179,6 +179,7 @@
     <SccLocalPath>SAK</SccLocalPath>
     <SccProvider>SAK</SccProvider>
     <ApplicationEnvironment>title</ApplicationEnvironment>
+    <WindowsTargetPlatformVersion Condition="'$(Platform)'=='x64'">10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Xbox 360'" Label="Configuration">
@@ -3957,7 +3958,7 @@
     </ClCompile>
     <ClCompile Include="ZoomLayer.cpp" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(Platform)'=='Durango'">
     <SDKReference Include="Xbox Services API, Version=8.0" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

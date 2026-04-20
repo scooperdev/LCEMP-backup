@@ -40,12 +40,29 @@
 #include "../../Minecraft.World/OldChunkStorage.h"
 
 #include "Network/WinsockNetLayer.h"
+#include "../Common/UI/UIScene_Keyboard.h"
 
 #include "../PlayerRenderer.h"
+#include "../LevelRenderer.h"
 
 #include "Windows64_PostProcess.h"
+#if defined(__linux__) || defined(_WIN32)
+#include "../../Minecraft.Server/Core/ServerThreadPool.h"
+#endif
 
 #include "Xbox/resource.h"
+
+#ifdef _WINDOWS64
+#include <dxgi1_2.h>
+#endif
+
+#if defined(_WIN32)
+extern "C"
+{
+	__declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
 
 HINSTANCE hMyInst;
 LRESULT CALLBACK DlgProc(HWND hWndDlg, UINT Msg, WPARAM wParam, LPARAM lParam);
@@ -87,6 +104,8 @@ int g_iScreenHeight = 1080;
 
 char g_Win64Username[17] = {0};
 wchar_t g_Win64UsernameW[17] = {0};
+
+static bool g_pendingGracefulWindowClose = false;
 
 void DefineActions(void)
 {
@@ -351,6 +370,123 @@ ID3D11RenderTargetView* g_pRenderTargetView = NULL;
 ID3D11DepthStencilView* g_pDepthStencilView = NULL;
 ID3D11Texture2D*		g_pDepthStencilBuffer = NULL;
 
+static bool g_usesModernSwapChain = false;
+
+template <typename T>
+static void SafeRelease(T*& ptr)
+{
+	if (ptr)
+	{
+		ptr->Release();
+		ptr = NULL;
+	}
+}
+
+static HRESULT CreateModernDeviceAndSwapChain(UINT createDeviceFlags, const D3D_FEATURE_LEVEL* featureLevels, UINT numFeatureLevels, UINT width, UINT height)
+{
+	HRESULT hr = E_FAIL;
+	ID3D11Device* createdDevice = NULL;
+	ID3D11DeviceContext* createdContext = NULL;
+	IDXGISwapChain* createdSwapChain = NULL;
+
+	D3D_DRIVER_TYPE modernDriverTypes[] =
+	{
+		D3D_DRIVER_TYPE_HARDWARE,
+		D3D_DRIVER_TYPE_WARP,
+	};
+
+	for (UINT driverTypeIndex = 0; driverTypeIndex < ARRAYSIZE(modernDriverTypes); ++driverTypeIndex)
+	{
+		D3D_FEATURE_LEVEL localFeatureLevel = D3D_FEATURE_LEVEL_11_0;
+		hr = D3D11CreateDevice(NULL,
+			modernDriverTypes[driverTypeIndex],
+			NULL,
+			createDeviceFlags,
+			featureLevels,
+			numFeatureLevels,
+			D3D11_SDK_VERSION,
+			&createdDevice,
+			&localFeatureLevel,
+			&createdContext);
+
+		if (HRESULT_SUCCEEDED(hr))
+		{
+			g_driverType = modernDriverTypes[driverTypeIndex];
+			g_featureLevel = localFeatureLevel;
+			break;
+		}
+	}
+
+	if (FAILED(hr))
+		return hr;
+
+	IDXGIDevice* dxgiDevice = NULL;
+	IDXGIDevice1* dxgiDevice1 = NULL;
+	IDXGIAdapter* dxgiAdapter = NULL;
+	IDXGIFactory2* dxgiFactory = NULL;
+	IDXGISwapChain1* swapChain1 = NULL;
+
+	do
+	{
+		hr = createdDevice->QueryInterface(__uuidof(IDXGIDevice), (void**)&dxgiDevice);
+		if (FAILED(hr)) break;
+
+		if (HRESULT_SUCCEEDED(createdDevice->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgiDevice1)))
+			dxgiDevice1->SetMaximumFrameLatency(1);
+
+		hr = dxgiDevice->GetAdapter(&dxgiAdapter);
+		if (FAILED(hr)) break;
+
+		hr = dxgiAdapter->GetParent(__uuidof(IDXGIFactory2), (void**)&dxgiFactory);
+		if (FAILED(hr)) break;
+
+		DXGI_SWAP_CHAIN_DESC1 swapDesc;
+		ZeroMemory(&swapDesc, sizeof(swapDesc));
+		swapDesc.Width = width;
+		swapDesc.Height = height;
+		swapDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		swapDesc.SampleDesc.Count = 1;
+		swapDesc.SampleDesc.Quality = 0;
+		swapDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		swapDesc.BufferCount = 2;
+		swapDesc.Scaling = DXGI_SCALING_STRETCH;
+		#ifdef DXGI_SWAP_EFFECT_FLIP_DISCARD
+		swapDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		#else
+		swapDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+		#endif
+		swapDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+		swapDesc.Flags = 0;
+
+		hr = dxgiFactory->CreateSwapChainForHwnd(createdDevice, g_hWnd, &swapDesc, NULL, NULL, &swapChain1);
+		if (FAILED(hr)) break;
+
+		dxgiFactory->MakeWindowAssociation(g_hWnd, DXGI_MWA_NO_ALT_ENTER);
+
+		hr = swapChain1->QueryInterface(__uuidof(IDXGISwapChain), (void**)&createdSwapChain);
+		if (FAILED(hr)) break;
+
+		g_pd3dDevice = createdDevice;
+		g_pImmediateContext = createdContext;
+		g_pSwapChain = createdSwapChain;
+		createdDevice = NULL;
+		createdContext = NULL;
+		createdSwapChain = NULL;
+		g_usesModernSwapChain = true;
+	} while (false);
+
+	SafeRelease(swapChain1);
+	SafeRelease(dxgiFactory);
+	SafeRelease(dxgiAdapter);
+	SafeRelease(dxgiDevice1);
+	SafeRelease(dxgiDevice);
+	SafeRelease(createdSwapChain);
+	SafeRelease(createdContext);
+	SafeRelease(createdDevice);
+
+	return hr;
+}
+
 void Windows64_UpdateGamma(unsigned short usGamma)
 {
 	float gamma = (float)usGamma / 32768.0f;
@@ -383,6 +519,49 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 	switch (message)
 	{
+	case WM_CLOSE:
+		if (g_pendingGracefulWindowClose)
+		{
+			return 0;
+		}
+
+		if (app.GetGameStarted())
+		{
+			if (!g_pendingGracefulWindowClose)
+			{
+				int iPad = ProfileManager.GetPrimaryPad();
+				if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+				{
+					iPad = 0;
+				}
+
+				MinecraftServer *server = MinecraftServer::getInstance();
+				if (server != NULL)
+				{
+					server->setSaveOnExit(true);
+				}
+
+				app.SetAction(iPad, eAppAction_ExitWorld);
+				g_pendingGracefulWindowClose = true;
+			}
+
+			return 0;
+		}
+
+		if (app.GetChangingSessionType() ||
+			app.GetReallyChangingSessionType() ||
+			g_NetworkManager.IsInSession() ||
+			g_NetworkManager.IsLeavingGame() ||
+			g_NetworkManager.IsNetworkThreadRunning() ||
+			StorageManager.GetSaveState() != C4JStorage::ESaveGame_Idle)
+		{
+			g_pendingGracefulWindowClose = true;
+			return 0;
+		}
+
+		DestroyWindow(hWnd);
+		return 0;
+
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
 		wmEvent = HIWORD(wParam);
@@ -390,7 +569,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (wmId)
 		{
 		case IDM_EXIT:
-			DestroyWindow(hWnd);
+			PostMessage(hWnd, WM_CLOSE, 0, 0);
 			break;
 
 		default:
@@ -421,6 +600,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_SYSKEYDOWN:
 	{
 		int vk = (int)wParam;
+		if (vk == VK_F12)
+			return 0;
+		if (Win64InGameKeyboard::IsActive())
+		{
+			if (vk == VK_LEFT || vk == VK_RIGHT || vk == VK_ESCAPE)
+			{
+				Win64InGameKeyboard::OnVirtualKeyDown((unsigned int)vk);
+				return 0;
+			}
+		}
 		if (vk == VK_F11)
 		{
 			ToggleFullscreen();
@@ -440,6 +629,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_SYSKEYUP:
 	{
 		int vk = (int)wParam;
+		if (vk == VK_F12)
+			return 0;
 		if (vk == VK_SHIFT)
 			vk = (MapVirtualKey((lParam >> 16) & 0xFF, MAPVK_VSC_TO_VK_EX) == VK_RSHIFT) ? VK_RSHIFT : VK_LSHIFT;
 		else if (vk == VK_CONTROL)
@@ -449,6 +640,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		g_KBMInput.OnKeyUp(vk);
 		break;
 	}
+
+	case WM_CHAR:
+	case WM_SYSCHAR:
+	case WM_IME_CHAR:
+		if (Win64InGameKeyboard::IsActive())
+		{
+			Win64InGameKeyboard::OnChar((wchar_t)wParam);
+			return 0;
+		}
+		break;
+
+	case WM_UNICHAR:
+		if (wParam == UNICODE_NOCHAR)
+		{
+			return TRUE;
+		}
+		if (Win64InGameKeyboard::IsActive())
+		{
+			Win64InGameKeyboard::OnChar((wchar_t)wParam);
+			return 0;
+		}
+		break;
 
 	case WM_LBUTTONDOWN:
 		g_KBMInput.OnMouseButtonDown(KeyboardMouseInput::MOUSE_LEFT);
@@ -659,7 +872,7 @@ HRESULT InitDevice()
 	height = g_iScreenHeight;
 app.DebugPrintf("width: %d, height: %d\n", width, height);
 
-	UINT createDeviceFlags = 0;
+	UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
 	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
@@ -680,30 +893,39 @@ app.DebugPrintf("width: %d, height: %d\n", width, height);
 	};
 	UINT numFeatureLevels = ARRAYSIZE( featureLevels );
 
-	DXGI_SWAP_CHAIN_DESC sd;
-	ZeroMemory( &sd, sizeof( sd ) );
-	sd.BufferCount = 1;
-	sd.BufferDesc.Width = width;
-	sd.BufferDesc.Height = height;
-	sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	sd.BufferDesc.RefreshRate.Numerator = 60;
-	sd.BufferDesc.RefreshRate.Denominator = 1;
-	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	sd.OutputWindow = g_hWnd;
-	sd.SampleDesc.Count = 1;
-	sd.SampleDesc.Quality = 0;
-	sd.Windowed = TRUE;
+	g_usesModernSwapChain = false;
+	hr = CreateModernDeviceAndSwapChain(createDeviceFlags, featureLevels, numFeatureLevels, width, height);
 
-	for( UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++ )
+	if (FAILED(hr))
 	{
-		g_driverType = driverTypes[driverTypeIndex];
-		hr = D3D11CreateDeviceAndSwapChain( NULL, g_driverType, NULL, createDeviceFlags, featureLevels, numFeatureLevels,
-			D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext );
-		if( HRESULT_SUCCEEDED( hr ) )
-			break;
+		DXGI_SWAP_CHAIN_DESC sd;
+		ZeroMemory( &sd, sizeof( sd ) );
+		sd.BufferCount = 1;
+		sd.BufferDesc.Width = width;
+		sd.BufferDesc.Height = height;
+		sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		sd.BufferDesc.RefreshRate.Numerator = 60;
+		sd.BufferDesc.RefreshRate.Denominator = 1;
+		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		sd.OutputWindow = g_hWnd;
+		sd.SampleDesc.Count = 1;
+		sd.SampleDesc.Quality = 0;
+		sd.Windowed = TRUE;
+
+		for( UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++ )
+		{
+			g_driverType = driverTypes[driverTypeIndex];
+			hr = D3D11CreateDeviceAndSwapChain( NULL, g_driverType, NULL, createDeviceFlags, featureLevels, numFeatureLevels,
+				D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext );
+			if( HRESULT_SUCCEEDED( hr ) )
+				break;
+		}
 	}
+
 	if( FAILED( hr ) )
 		return hr;
+
+	app.DebugPrintf("Renderer init: %s swap chain\n", g_usesModernSwapChain ? "DXGI flip-model" : "legacy");
 
 	// Create a render target view
 	ID3D11Texture2D* pBackBuffer = NULL;
@@ -890,6 +1112,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 #if 0
 	// Main message loop
 	MSG msg = {0};
+	DWORD menuFrameStart = 0;
 	while( WM_QUIT != msg.message )
 	{
 		if( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
@@ -1109,6 +1332,16 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 
 	app.InitGameSettings();
 
+	for (int i = 0; i < XUSER_MAX_COUNT; ++i)
+	{
+		void *pData = ProfileManager.GetGameDefinedProfileData(i);
+		if (pData != NULL && pMinecraft->stats[i] != NULL)
+		{
+			pMinecraft->stats[i]->clear();
+			pMinecraft->stats[i]->parse(pData);
+		}
+	}
+
 	if(app.GetGameSettings(eGameSetting_Fullscreen) != 0)
 	{
 		if(!g_isFullscreen)
@@ -1204,6 +1437,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	}
 #endif
 	MSG msg = {0};
+	DWORD menuFrameStart = 0;
 	while( WM_QUIT != msg.message )
 	{
 		while( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
@@ -1213,6 +1447,22 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			if (msg.message == WM_QUIT) break;
 		}
 		if (msg.message == WM_QUIT) break;
+
+		if (!app.GetGameStarted() || pMinecraft->screen != NULL)
+		{
+			const DWORD now = GetTickCount();
+			if (menuFrameStart != 0)
+			{
+				const DWORD elapsed = now - menuFrameStart;
+				if (elapsed < 16)
+					Sleep(16 - elapsed);
+			}
+			menuFrameStart = GetTickCount();
+		}
+		else
+		{
+			menuFrameStart = 0;
+		}
 
 		g_KBMInput.Tick();
 
@@ -1454,6 +1704,22 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		// Any threading type things to deal with from the xui side?
 		app.HandleXuiActions();
 
+		if (g_pendingGracefulWindowClose)
+		{
+			if (!app.GetGameStarted() &&
+				!app.GetChangingSessionType() &&
+				!app.GetReallyChangingSessionType() &&
+				!g_NetworkManager.IsInSession() &&
+				!g_NetworkManager.IsLeavingGame() &&
+				!g_NetworkManager.IsNetworkThreadRunning() &&
+				StorageManager.GetSaveState() == C4JStorage::ESaveGame_Idle)
+			{
+				g_pendingGracefulWindowClose = false;
+				DestroyWindow(g_hWnd);
+				continue;
+			}
+		}
+
 #if 0
 		PIXEndNamedEvent();
 #endif
@@ -1489,7 +1755,15 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 
 	// Free resources, unregister custom classes, and exit.
 	//	app.Uninit();
-	g_pd3dDevice->Release();
+#ifdef _LARGE_WORLDS
+	LevelRenderer::shutdownRebuildThreads();
+#endif
+	g_NetworkManager.Terminate();
+#if defined(__linux__) || defined(_WIN32)
+	ServerThreadPool::Shutdown();
+#endif
+	CleanupDevice();
+	return 0;
 }
 
 #ifdef MEMORY_TRACKING

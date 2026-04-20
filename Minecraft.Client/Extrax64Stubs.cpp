@@ -3,6 +3,12 @@
 //#include <compressapi.h>
 #endif // __PS3__
 
+#if defined(__linux__)
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
 #ifdef __PS3__
 #include "PS3/Sentient/SentientManager.h"
 #include "StatsCounter.h"
@@ -190,6 +196,26 @@ D3DXVECTOR3& D3DXVECTOR3::operator += ( CONST D3DXVECTOR3& add ) { x += add.x; y
 
 #include "Windows64/Network/WinsockNetLayer.h"
 
+static const DWORD WIN64_QNET_DEFAULT_CAPACITY = MINECRAFT_NET_MAX_PLAYERS;
+static const DWORD WIN64_QNET_MAX_CAPACITY = 255;
+
+static DWORD Win64_ClampQNetCapacity(DWORD capacity)
+{
+	if (capacity < 1)
+		capacity = 1;
+	if (capacity > WIN64_QNET_MAX_CAPACITY)
+		capacity = WIN64_QNET_MAX_CAPACITY;
+	return capacity;
+}
+
+static void Win64_EnsureQNetStorage()
+{
+	if (IQNet::m_player == NULL || IQNet::s_playerCapacity == 0)
+	{
+		IQNet::SetPlayerCapacity(WIN64_QNET_DEFAULT_CAPACITY);
+	}
+}
+
 BYTE IQNetPlayer::GetSmallId() { return m_smallId; }
 void IQNetPlayer::SendData(IQNetPlayer *player, const void *pvData, DWORD dwDataSize, DWORD dwFlags)
 {
@@ -209,6 +235,7 @@ static void Win64_BuildSplitName(int iPad, char *outName, int outSize);
 PlayerUID IQNetPlayer::GetXuid()
 {
 #ifdef _WINDOWS64
+	Win64_EnsureQNetStorage();
 	if (!m_isRemote)
 	{
 		int idx = (int)(this - &IQNet::m_player[0]);
@@ -230,6 +257,7 @@ PlayerUID IQNetPlayer::GetXuid()
 
 PlayerUID Win64_UsernameToXuid(const char* username)
 {
+	Win64_EnsureQNetStorage();
 	uint64_t hash = 14695981039346656037ULL;
 	for (const char* p = username; *p; ++p)
 	{
@@ -238,8 +266,9 @@ PlayerUID Win64_UsernameToXuid(const char* username)
 	}
 
 	const uint64_t WIN64_XUID_BASE = 0xe000d45248242f2e;
-	if (hash >= WIN64_XUID_BASE && hash <= WIN64_XUID_BASE + MINECRAFT_NET_MAX_PLAYERS)
-		hash = WIN64_XUID_BASE + MINECRAFT_NET_MAX_PLAYERS + 1;
+	uint64_t reservedRange = IQNet::GetPlayerCapacity();
+	if (hash >= WIN64_XUID_BASE && hash <= WIN64_XUID_BASE + reservedRange)
+		hash = WIN64_XUID_BASE + reservedRange + 1;
 	if (hash == 0)
 		hash = 1;
 	return (PlayerUID)hash;
@@ -257,10 +286,12 @@ PlayerUID Win64_UsernameToXuid(const wchar_t* username)
 
 static void Win64_BuildSplitName(int iPad, char *outName, int outSize)
 {
+	Win64_EnsureQNetStorage();
 	extern char g_Win64Username[17];
 	char candidate[32];
 	sprintf_s(candidate, sizeof(candidate), "%s_%d", g_Win64Username, iPad);
-	for (DWORD i = 0; i < MINECRAFT_NET_MAX_PLAYERS; i++)
+	DWORD capacity = IQNet::GetPlayerCapacity();
+	for (DWORD i = 0; i < capacity; i++)
 	{
 		if (!IQNet::m_player[i].m_isRemote) continue;
 		if (IQNet::m_player[i].m_gamertag[0] == 0) continue;
@@ -307,7 +338,10 @@ bool IQNetPlayer::HasVoice() {
 #endif
 }
 bool IQNetPlayer::HasCamera() { return false; }
-int IQNetPlayer::GetUserIndex() { return this - &IQNet::m_player[0]; }
+int IQNetPlayer::GetUserIndex() {
+	Win64_EnsureQNetStorage();
+	return (int)(this - &IQNet::m_player[0]);
+}
 void IQNetPlayer::SetCustomDataValue(ULONG_PTR ulpCustomDataValue) {
 	m_customData = ulpCustomDataValue;
 }
@@ -315,9 +349,76 @@ ULONG_PTR IQNetPlayer::GetCustomDataValue() {
 	return m_customData;
 }
 
-IQNetPlayer IQNet::m_player[MINECRAFT_NET_MAX_PLAYERS];
+IQNetPlayer *IQNet::m_player = NULL;
+DWORD IQNet::s_playerCapacity = 0;
 DWORD IQNet::s_playerCount = 1;
 bool IQNet::s_isHosting = true;
+
+void IQNet::SetPlayerCapacity(DWORD capacity)
+{
+	DWORD newCapacity = Win64_ClampQNetCapacity(capacity);
+	if (m_player != NULL && s_playerCapacity == newCapacity)
+	{
+		if (s_playerCount > s_playerCapacity)
+			s_playerCount = s_playerCapacity;
+		if (s_playerCount == 0)
+			s_playerCount = 1;
+		return;
+	}
+
+	IQNetPlayer *newPlayers = new IQNetPlayer[newCapacity];
+	for (DWORD i = 0; i < newCapacity; ++i)
+	{
+		newPlayers[i].m_smallId = (BYTE)i;
+		newPlayers[i].m_isRemote = false;
+		newPlayers[i].m_isHostPlayer = false;
+		newPlayers[i].m_gamertag[0] = 0;
+		newPlayers[i].SetCustomDataValue(0);
+	}
+
+	if (m_player != NULL)
+	{
+		DWORD copyCount = (s_playerCapacity < newCapacity) ? s_playerCapacity : newCapacity;
+		for (DWORD i = 0; i < copyCount; ++i)
+		{
+			newPlayers[i] = m_player[i];
+		}
+		delete [] m_player;
+	}
+
+	m_player = newPlayers;
+	s_playerCapacity = newCapacity;
+	if (s_playerCount > s_playerCapacity)
+		s_playerCount = s_playerCapacity;
+	if (s_playerCount == 0)
+		s_playerCount = 1;
+}
+
+DWORD IQNet::GetPlayerCapacity()
+{
+	Win64_EnsureQNetStorage();
+	return s_playerCapacity;
+}
+
+struct IQNetStorageBootstrap
+{
+	IQNetStorageBootstrap()
+	{
+		IQNet::SetPlayerCapacity(WIN64_QNET_DEFAULT_CAPACITY);
+	}
+
+	~IQNetStorageBootstrap()
+	{
+		if (IQNet::m_player != NULL)
+		{
+			delete [] IQNet::m_player;
+			IQNet::m_player = NULL;
+		}
+		IQNet::s_playerCapacity = 0;
+	}
+};
+
+static IQNetStorageBootstrap g_iqNetStorageBootstrap;
 
 QNET_STATE _iQNetStubState = QNET_STATE_IDLE;
 
@@ -337,7 +438,11 @@ static bool Win64_IsActivePlayer(IQNetPlayer *p, DWORD index);
 
 HRESULT IQNet::AddLocalPlayerByUserIndex(DWORD dwUserIndex)
 {
-	if (dwUserIndex >= MINECRAFT_NET_MAX_PLAYERS) return E_FAIL;
+	Win64_EnsureQNetStorage();
+	if (dwUserIndex >= GetPlayerCapacity())
+		SetPlayerCapacity(dwUserIndex + 1);
+	if (dwUserIndex >= GetPlayerCapacity())
+		return E_FAIL;
 	m_player[dwUserIndex].m_isRemote = false;
 	m_player[dwUserIndex].m_smallId = (BYTE)dwUserIndex;
 	if (dwUserIndex > 0)
@@ -350,12 +455,16 @@ HRESULT IQNet::AddLocalPlayerByUserIndex(DWORD dwUserIndex)
 		s_playerCount = dwUserIndex + 1;
 	return S_OK;
 }
-IQNetPlayer *IQNet::GetHostPlayer() { return &m_player[0]; }
+IQNetPlayer *IQNet::GetHostPlayer() {
+	Win64_EnsureQNetStorage();
+	return &m_player[0];
+}
 IQNetPlayer *IQNet::GetLocalPlayerByUserIndex(DWORD dwUserIndex)
 {
+	Win64_EnsureQNetStorage();
 	if (s_isHosting)
 	{
-		if (dwUserIndex < MINECRAFT_NET_MAX_PLAYERS &&
+		if (dwUserIndex < GetPlayerCapacity() &&
 			!m_player[dwUserIndex].m_isRemote)
 			return &m_player[dwUserIndex];
 		return NULL;
@@ -384,6 +493,7 @@ static bool Win64_IsActivePlayer(IQNetPlayer *p, DWORD index)
 
 IQNetPlayer *IQNet::GetPlayerByIndex(DWORD dwPlayerIndex)
 {
+	Win64_EnsureQNetStorage();
 	DWORD found = 0;
 	for (DWORD i = 0; i < s_playerCount; i++)
 	{
@@ -397,7 +507,10 @@ IQNetPlayer *IQNet::GetPlayerByIndex(DWORD dwPlayerIndex)
 }
 IQNetPlayer *IQNet::GetPlayerBySmallId(BYTE SmallId)
 {
-	if (SmallId >= MINECRAFT_NET_MAX_PLAYERS)
+	Win64_EnsureQNetStorage();
+	if (SmallId >= GetPlayerCapacity())
+		SetPlayerCapacity((DWORD)SmallId + 1);
+	if (SmallId >= GetPlayerCapacity())
 		return NULL;
 
 	m_player[SmallId].m_smallId = SmallId;
@@ -407,7 +520,9 @@ IQNetPlayer *IQNet::GetPlayerBySmallId(BYTE SmallId)
 }
 IQNetPlayer *IQNet::GetPlayerByXuid(PlayerUID xuid)
 {
-	for (DWORD i = 0; i < MINECRAFT_NET_MAX_PLAYERS; i++)
+	Win64_EnsureQNetStorage();
+	DWORD capacity = GetPlayerCapacity();
+	for (DWORD i = 0; i < capacity; i++)
 	{
 		if (Win64_IsActivePlayer(&m_player[i], i) && m_player[i].GetXuid() == xuid) return &m_player[i];
 	}
@@ -415,6 +530,7 @@ IQNetPlayer *IQNet::GetPlayerByXuid(PlayerUID xuid)
 }
 DWORD IQNet::GetPlayerCount()
 {
+	Win64_EnsureQNetStorage();
 	DWORD count = 0;
 	for (DWORD i = 0; i < s_playerCount; i++)
 	{
@@ -428,10 +544,12 @@ HRESULT IQNet::JoinGameFromInviteInfo(DWORD dwUserIndex, DWORD dwUserMask, const
 void IQNet::HostGame() { _iQNetStubState = QNET_STATE_SESSION_STARTING; s_isHosting = true; }
 void IQNet::ClientJoinGame()
 {
+	Win64_EnsureQNetStorage();
 	_iQNetStubState = QNET_STATE_SESSION_STARTING;
 	s_isHosting = false;
 
-	for (int i = 0; i < MINECRAFT_NET_MAX_PLAYERS; i++)
+	DWORD capacity = GetPlayerCapacity();
+	for (DWORD i = 0; i < capacity; i++)
 	{
 		m_player[i].m_smallId = (BYTE)i;
 		m_player[i].m_isRemote = true;
@@ -442,10 +560,12 @@ void IQNet::ClientJoinGame()
 }
 void IQNet::EndGame()
 {
+	Win64_EnsureQNetStorage();
 	_iQNetStubState = QNET_STATE_IDLE;
 	s_isHosting = false;
 	s_playerCount = 1;
-	for (int i = 0; i < MINECRAFT_NET_MAX_PLAYERS; i++)
+	DWORD capacity = GetPlayerCapacity();
+	for (DWORD i = 0; i < capacity; i++)
 	{
 		m_player[i].m_smallId = (BYTE)i;
 		m_player[i].m_isRemote = false;
@@ -619,20 +739,90 @@ bool Win64_HasSavedProfile(int iPad)
 	return false;
 }
 
+static void GetProfileRootPath(char *outPath, int maxLen)
+{
+	#if defined(__linux__)
+	char curDir[256] = {0};
+	if (getcwd(curDir, sizeof(curDir)) == NULL)
+	{
+		outPath[0] = 0;
+		return;
+	}
+
+	char win64Path[256] = {0};
+	snprintf(win64Path, sizeof(win64Path), "%s/Windows64", curDir);
+	mkdir(win64Path, 0755);
+	snprintf(outPath, maxLen, "%s/Windows64/GameHDD", curDir);
+	mkdir(outPath, 0755);
+	return;
+	#else
+	char exePath[MAX_PATH] = {0};
+	DWORD exeLen = GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	if (exeLen > 0 && exeLen < MAX_PATH)
+	{
+		char *lastSlash = strrchr(exePath, '\\');
+		if (lastSlash != NULL)
+		{
+			*lastSlash = '\0';
+			char win64Path[MAX_PATH] = {0};
+			sprintf_s(win64Path, sizeof(win64Path), "%s\\Windows64", exePath);
+			CreateDirectoryA(win64Path, 0);
+			sprintf_s(outPath, maxLen, "%s\\Windows64\\GameHDD", exePath);
+			CreateDirectoryA(outPath, 0);
+			return;
+		}
+	}
+
+	char curDir[256] = {0};
+	GetCurrentDirectoryA(sizeof(curDir), curDir);
+	char win64Path[256] = {0};
+	sprintf_s(win64Path, sizeof(win64Path), "%s\\Windows64", curDir);
+	CreateDirectoryA(win64Path, 0);
+	sprintf_s(outPath, maxLen, "%s\\Windows64\\GameHDD", curDir);
+	CreateDirectoryA(outPath, 0);
+	#endif
+}
+
 static void GetProfileFilePath(int iQuadrant, char *outPath, int maxLen)
 {
-	char curDir[256];
+	char rootPath[MAX_PATH] = {0};
+	GetProfileRootPath(rootPath, sizeof(rootPath));
+	#if defined(__linux__)
+	snprintf(outPath, maxLen, "%s/profile_%d.dat", rootPath, iQuadrant);
+	#else
+	sprintf_s(outPath, maxLen, "%s\\profile_%d.dat", rootPath, iQuadrant);
+	#endif
+}
+
+static void GetLegacyProfileFilePath(int iQuadrant, char *outPath, int maxLen)
+{
+	#if defined(__linux__)
+	char curDir[256] = {0};
+	if (getcwd(curDir, sizeof(curDir)) == NULL)
+	{
+		outPath[0] = 0;
+		return;
+	}
+	snprintf(outPath, maxLen, "%s/Windows64/GameHDD/profile_%d.dat", curDir, iQuadrant);
+	#else
+	char curDir[256] = {0};
 	GetCurrentDirectoryA(sizeof(curDir), curDir);
 	sprintf_s(outPath, maxLen, "%s\\Windows64\\GameHDD\\profile_%d.dat", curDir, iQuadrant);
+	#endif
 }
 
 static bool LoadProfileFromDisk(int iQuadrant, void *pData, int dataSize)
 {
-	char path[256];
+	char path[MAX_PATH] = {0};
 	GetProfileFilePath(iQuadrant, path, sizeof(path));
 	FILE *f = NULL;
 	fopen_s(&f, path, "rb");
-	if (!f) return false;
+	if (!f)
+	{
+		GetLegacyProfileFilePath(iQuadrant, path, sizeof(path));
+		fopen_s(&f, path, "rb");
+		if (!f) return false;
+	}
 	size_t bytesRead = fread(pData, 1, dataSize, f);
 	fclose(f);
 	return (bytesRead == (size_t)dataSize);
@@ -640,7 +830,7 @@ static bool LoadProfileFromDisk(int iQuadrant, void *pData, int dataSize)
 
 static void SaveProfileToDisk(int iQuadrant, void *pData, int dataSize)
 {
-	char path[256];
+	char path[MAX_PATH] = {0};
 	GetProfileFilePath(iQuadrant, path, sizeof(path));
 	FILE *f = NULL;
 	fopen_s(&f, path, "wb");

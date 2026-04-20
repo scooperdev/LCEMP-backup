@@ -135,6 +135,7 @@ void CSaveGame::ResetSaveData()
     free(m_pSaveData);
     m_pSaveData = nullptr;
     m_uiSaveSize = 0;
+    m_szSaveUniqueName[0] = '\0';
 }
 
 C4JStorage::ESaveGameState CSaveGame::GetSavesInfo(int iPad, int (*Func)(LPVOID lpParam, SAVE_DETAILS *pSaveDetails, const bool), LPVOID lpParam,

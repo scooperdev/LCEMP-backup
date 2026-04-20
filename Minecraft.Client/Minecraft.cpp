@@ -28,6 +28,9 @@
 #include "ErrorScreen.h"
 #include "TitleScreen.h"
 #include "InventoryScreen.h"
+#if !defined(_DEDICATED_SERVER)
+#include "ChatScreen.h"
+#endif
 #include "InBedChatScreen.h"
 #include "AchievementPopup.h"
 #include "Input.h"
@@ -35,6 +38,9 @@
 #include "Camera.h"
 #ifdef _WINDOWS64
 #include "KeyboardMouseInput.h"
+#endif
+#if defined(_WINDOWS64) && !defined(_DEDICATED_SERVER)
+#include "Common/UI/UIScene_Keyboard.h"
 #endif
 #if defined(_WINDOWS64) && !defined(_DEDICATED_SERVER)
 #include "Windows64/Audio/VoiceChat.h"
@@ -69,12 +75,103 @@
 #include "../Minecraft.World/SparseLightStorage.h"
 #include "../Minecraft.World/SparseDataStorage.h"
 #include "TextureManager.h"
+#include "../Minecraft.World/SharedConstants.h"
 #ifdef _XBOX
 #include "Xbox/Network/NetworkPlayerXbox.h"
 #endif
 #include "Common/UI/IUIScene_CreativeMenu.h"
 #include "Common/UI/UIFontData.h"
 #include "DLCTexturePack.h"
+
+#if defined(_WINDOWS64) && !defined(_DEDICATED_SERVER)
+namespace
+{
+	wstring TrimKBMChatMessage(const wstring &message)
+	{
+		size_t start = 0;
+		while (start < message.length() && iswspace(message[start]))
+		{
+			++start;
+		}
+
+		size_t end = message.length();
+		while (end > start && iswspace(message[end - 1]))
+		{
+			--end;
+		}
+
+		return message.substr(start, end - start);
+	}
+
+	bool IsTextChatEnabled(Minecraft *minecraft)
+	{
+		if (minecraft == NULL)
+		{
+			return false;
+		}
+
+		if (!minecraft->isClientSide())
+		{
+			return true;
+		}
+
+		return app.GetGameHostOption(eGameHostOption_ChatDisabled) == 0;
+	}
+
+	int KBMChatKeyboardCompleteCallback(void *lpParam, const bool bRes)
+	{
+		Minecraft *minecraft = (Minecraft *)lpParam;
+		if (minecraft == NULL || !bRes)
+		{
+			return 0;
+		}
+
+		if (!IsTextChatEnabled(minecraft))
+		{
+			return 0;
+		}
+
+		uint16_t ui16Text[SharedConstants::maxChatLength + 2];
+		ZeroMemory(ui16Text, sizeof(ui16Text));
+		Win64InGameKeyboard::GetText(ui16Text);
+
+		wstring chatMessage = TrimKBMChatMessage((wchar_t *)ui16Text);
+		if (chatMessage.length() == 0)
+		{
+			return 0;
+		}
+
+		if (!minecraft->handleClientSideCommand(chatMessage) && minecraft->player != NULL)
+		{
+			minecraft->player->chat(chatMessage);
+		}
+
+		return 0;
+	}
+
+	void OpenKBMChatKeyboard(Minecraft *minecraft)
+	{
+		if (minecraft == NULL || Win64InGameKeyboard::IsActive() || !IsTextChatEnabled(minecraft))
+		{
+			return;
+		}
+
+		unsigned int iPad = 0;
+		if (minecraft->player != NULL && minecraft->player->GetXboxPad() >= 0)
+		{
+			iPad = (unsigned int)minecraft->player->GetXboxPad();
+		}
+
+		Win64InGameKeyboard::Request(L"Chat Message",
+			L"",
+			iPad,
+			SharedConstants::maxChatLength,
+			&KBMChatKeyboardCompleteCallback,
+			minecraft,
+			C_4JInput::EKeyboardMode_Default);
+	}
+}
+#endif
 
 #ifdef __ORBIS__
 #include "Orbis/Network/PsPlusUpsellWrapper_Orbis.h"
@@ -1490,11 +1587,18 @@ void Minecraft::run_middle()
 							if(g_KBMInput.IsKeyPressed(KeyboardMouseInput::KEY_CRAFTING) || g_KBMInput.IsKeyPressed(KeyboardMouseInput::KEY_CRAFTING_ALT))
 								localplayers[i]->ullButtonsPressed|=1LL<<MINECRAFT_ACTION_CRAFTING;
 
-							int wheel = g_KBMInput.GetMouseWheel();
-							if (wheel > 0)
-								localplayers[i]->ullButtonsPressed|=1LL<<MINECRAFT_ACTION_RIGHT_SCROLL;
-							else if (wheel < 0)
-								localplayers[i]->ullButtonsPressed|=1LL<<MINECRAFT_ACTION_LEFT_SCROLL;
+							#if defined(_WINDOWS64) && !defined(_DEDICATED_SERVER)
+							if (g_KBMInput.IsKeyPressed(KeyboardMouseInput::KEY_CHAT))
+							{
+								if (isClientSide() && IsTextChatEnabled(this) && screen == NULL && !ui.GetMenuDisplayed(i) && g_KBMInput.IsMouseGrabbed())
+								{
+									if (localplayers[i]->isSleeping() && level != NULL && level->isClientSide)
+										setScreen(new InBedChatScreen());
+									else
+										OpenKBMChatKeyboard(this);
+								}
+							}
+							#endif
 
 							for (int slot = 0; slot < 9; slot++)
 							{
@@ -3276,11 +3380,10 @@ void Minecraft::tick(bool bFirst, bool bUpdateTextures)
 			wheel = -1;
 		}
 #ifdef _WINDOWS64
-		if (iPad == 0 && wheel == 0 && g_KBMInput.IsKBMActive())
+		if (iPad == 0 && wheel == 0 && g_KBMInput.IsKBMActive() && g_KBMInput.IsMouseGrabbed())
 		{
-			int mw = g_KBMInput.GetMouseWheel();
-			if (mw > 0) wheel = -1;
-			else if (mw < 0) wheel = 1;
+			int mw = g_KBMInput.ConsumeMouseWheel();
+			if (mw != 0) wheel = mw;
 		}
 #endif
 		if (wheel != 0)

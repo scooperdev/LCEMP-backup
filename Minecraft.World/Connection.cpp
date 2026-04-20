@@ -29,6 +29,7 @@ void Connection::_init()
 	running = true;
 	quitting = false;
 	disconnected = false;
+	m_closeState = 0;
 	disconnectReason = DisconnectPacket::eDisconnect_None;
 	noInputTicks = 0;
 	estimatedRemaining = 0;
@@ -45,12 +46,19 @@ void Connection::_init()
 // 4J Jev, need to delete the critical section.
 Connection::~Connection()
 {
-	// 4J Stu - Just to be sure, make sure the read and write threads terminate themselves before the connection object is destroyed
-	running = false;
-	if( dis ) dis->close();		// The input stream needs closed before the readThread, or the readThread
-								// may get stuck whilst blocking waiting on a read
-	readThread->WaitForCompletion(INFINITE);
-	writeThread->WaitForCompletion(INFINITE);
+	LONG closeState = InterlockedCompareExchange(&m_closeState, 1, 0);
+	if (closeState == 0)
+	{
+		shutdownConnectionResources();
+		InterlockedExchange(&m_closeState, 2);
+	}
+	else if (closeState == 1)
+	{
+		while (InterlockedCompareExchange(&m_closeState, 2, 2) != 2)
+		{
+			Sleep(0);
+		}
+	}
 
 	DeleteCriticalSection(&writeLock);
 	DeleteCriticalSection(&threadCounterLock);
@@ -72,6 +80,36 @@ Connection::~Connection()
 	}
 	delete dis;
 	dis = NULL;
+}
+
+void Connection::shutdownConnectionResources()
+{
+	running = false;
+	if( dis ) dis->close();
+
+	if( readThread ) readThread->WaitForCompletion(INFINITE);
+	if( writeThread ) writeThread->WaitForCompletion(INFINITE);
+
+	delete dis;
+	dis = NULL;
+	if( bufferedDos )
+	{
+		bufferedDos->close();
+		bufferedDos->deleteChildStream();
+		delete bufferedDos;
+		bufferedDos = NULL;
+	}
+	if( byteArrayDos )
+	{
+		byteArrayDos->close();
+		delete byteArrayDos;
+		byteArrayDos = NULL;
+	}
+	if( socket )
+	{
+		socket->close(packetListener != NULL ? packetListener->isServerPacketListener() : false);
+		socket = NULL;
+	}
 }
 
 Connection::Connection(Socket *socket, const wstring& id, PacketListener *packetListener) // throws IOException
@@ -334,31 +372,16 @@ close("disconnect.genericReason", "Internal exception: " + e.toString());
 void Connection::close(DisconnectPacket::eDisconnectReason reason, ...)
 {
 //	printf("Con:0x%x close\n",this);
-	if (!running) return;
+	if (InterlockedCompareExchange(&m_closeState, 1, 0) != 0) return;
 //	printf("Con:0x%x close doing something\n",this);
 	disconnected = true;
 
 	va_list input;
 	va_start( input, reason );
 
-	disconnectReason = reason;//va_arg( input, const wstring );
-
-	vector<void *> objs = vector<void *>();
-	void *i = NULL;
-	while (i != NULL)
-	{
-		i = va_arg( input, void* );
-		objs.push_back(i);
-	}
-
-	if( objs.size() )
-	{
-		disconnectReasonObjects = &objs[0];
-	}
-	else
-	{
-		disconnectReasonObjects = NULL;
-	}
+	disconnectReason = reason;
+	disconnectReasonObjects = NULL;
+	va_end(input);
 
 	//	int count = 0, sum = 0, i = first;
 	//	va_list marker;
@@ -376,35 +399,8 @@ void Connection::close(DisconnectPacket::eDisconnectReason reason, ...)
 
 //	CreateThread(NULL, 0, runClose, this, 0, &closeThreadID);
 
-	running = false;
-
-	if( dis ) dis->close();		// The input stream needs closed before the readThread, or the readThread
-						// may get stuck whilst blocking waiting on a read
-
-	// Make sure that the read & write threads are dead before we go and kill the streams that they depend on
-	readThread->WaitForCompletion(INFINITE);
-	writeThread->WaitForCompletion(INFINITE);
-
-	delete dis;
-	dis = NULL;
-	if( bufferedDos )
-	{
-		bufferedDos->close();
-		bufferedDos->deleteChildStream();
-		delete bufferedDos;
-		bufferedDos = NULL;
-	}
-	if( byteArrayDos )
-	{
-		byteArrayDos->close();
-		delete byteArrayDos;
-		byteArrayDos = NULL;
-	}
-	if( socket )
-	{
-		socket->close(packetListener->isServerPacketListener());
-		socket = NULL;
-	}
+	shutdownConnectionResources();
+	InterlockedExchange(&m_closeState, 2);
 }
 
 void Connection::tick()
@@ -467,6 +463,12 @@ void Connection::tick()
 	// MGH - moved the packet handling outside of the incoming_cs block, as it was locking up sometimes when disconnecting
 	for(int i=0; i<packetsToHandle.size();i++)
 	{
+		// if a packet handler disconnected this connection, drop any remaining queued packets
+		if (disconnected || quitting || packetListener == NULL)
+		{
+			break;
+		}
+
 		PIXBeginNamedEvent(0,"Handling packet %d\n",packetsToHandle[i]->getId());
 		packetsToHandle[i]->handle(packetListener);
 		PIXEndNamedEvent();

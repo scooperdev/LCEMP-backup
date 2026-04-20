@@ -102,7 +102,7 @@ C4JStorage::EDLCStatus CDLC::GetInstalledDLC(int iPad, int (*Func)(LPVOID, int, 
             {
                 XCONTENT_DATA data;
                 snprintf(data.szFileName, sizeof(data.szFileName), "%s/%s", dlcDir, entry->d_name);
-                swprintf(data.szDisplayName, 256, L"%s", entry->d_name);
+                swprintf(data.szDisplayName, XCONTENT_MAX_DISPLAYNAME_LENGTH, L"%hs", entry->d_name);
                 data.DeviceID = 0;
                 data.dwContentType = 0;
                 AddInstalled(&data);
@@ -157,8 +157,7 @@ C4JStorage::EDLCStatus CDLC::GetInstalledDLC(int iPad, int (*Func)(LPVOID, int, 
                     sprintf(data.szFileName, "Windows64Media/DLC/%s", hFind.cFileName);
                 }
 
-                swprintf(data.szDisplayName, 256, L"%s", hFind.cFileName);
-                int displayNameLen = wcslen(data.szDisplayName);
+                swprintf(data.szDisplayName, XCONTENT_MAX_DISPLAYNAME_LENGTH, L"%hs", hFind.cFileName);
 
                 data.DeviceID = 0;
                 data.dwContentType = 0;

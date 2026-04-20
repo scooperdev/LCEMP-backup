@@ -247,6 +247,10 @@ public:
 	// Minecraft language select
 	void			SetMinecraftLanguage(int iPad, unsigned char ucLanguage);
 	unsigned char	GetMinecraftLanguage(int iPad);
+	int				GetSavedServerCount(int iPad);
+	bool			GetSavedServer(int iPad, int index, char *pName, int nameSize, char *pHost, int hostSize, unsigned short *pPort);
+	bool			AddOrUpdateSavedServer(int iPad, const char *pszName, const char *pszHost, unsigned short usPort);
+	bool			RemoveSavedServer(int iPad, const char *pszHost, unsigned short usPort);
 
 
 	// 4J-PB - set a timer when the user navigates the quickselect, so we can bring the opacity back to defaults for a short time

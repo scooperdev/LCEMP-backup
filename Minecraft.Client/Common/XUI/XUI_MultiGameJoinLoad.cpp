@@ -21,6 +21,7 @@
 #include "XUI_MultiGameCreate.h"
 #include "../../MinecraftServer.h"
 #include "../../Options.h"
+#include "../UI/UIScene_Keyboard.h"
 
 #include "../GameRules/LevelGenerationOptions.h"
 #include "../../TexturePackRepository.h"
@@ -2241,7 +2242,11 @@ int CScene_MultiGameJoinLoad::SaveOptionsDialogReturned(void *pParam,int iPad,C4
 		{
 			ZeroMemory(pClass->m_wchNewName,sizeof(WCHAR)*XCONTENT_MAX_DISPLAYNAME_LENGTH);
 			// bring up a keyboard
+		#ifdef _WINDOWS64
+			Win64InGameKeyboard::Request(app.GetString(IDS_RENAME_WORLD_TITLE), L"", (unsigned int)iPad, XCONTENT_MAX_DISPLAYNAME_LENGTH - 1, &CScene_MultiGameJoinLoad::KeyboardReturned, pClass, C_4JInput::EKeyboardMode_Default, pClass->m_wchNewName, XCONTENT_MAX_DISPLAYNAME_LENGTH);
+		#else
 			InputManager.RequestKeyboard(IDS_RENAME_WORLD_TITLE,L"",IDS_RENAME_WORLD_TEXT,iPad,pClass->m_wchNewName,XCONTENT_MAX_DISPLAYNAME_LENGTH,&CScene_MultiGameJoinLoad::KeyboardReturned,pClass,C_4JInput::EKeyboardMode_Default,app.GetStringTable());
+		#endif
 		}
 		else // delete
 		{

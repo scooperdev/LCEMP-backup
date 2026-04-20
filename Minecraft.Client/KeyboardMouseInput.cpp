@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "KeyboardMouseInput.h"
+#if defined(_WINDOWS64) && !defined(_DEDICATED_SERVER)
 #include "Windows64/KBMConfig.h"
+#endif
 #include <cmath>
 
 KeyboardMouseInput g_KBMInput;
@@ -14,6 +16,7 @@ int KeyboardMouseInput::KEY_SNEAK = VK_LSHIFT;
 int KeyboardMouseInput::KEY_SPRINT = VK_LCONTROL;
 int KeyboardMouseInput::KEY_INVENTORY = 'E';
 int KeyboardMouseInput::KEY_DROP = 'Q';
+int KeyboardMouseInput::KEY_CHAT = 'T';
 int KeyboardMouseInput::KEY_CRAFTING = VK_TAB;
 int KeyboardMouseInput::KEY_CONFIRM = VK_RETURN;
 int KeyboardMouseInput::KEY_PAUSE = VK_ESCAPE;
@@ -29,6 +32,26 @@ static void ClipCursorToWindow(HWND hWnd);
 // coded by notpies fr
 void KeyboardMouseInput::Init()
 {
+	#if defined(_WINDOWS64) && !defined(_DEDICATED_SERVER)
+	KBMConfig& cfg = KBMConfig::Get();
+	KeyboardMouseInput::KEY_FORWARD = cfg.keyForward;
+	KeyboardMouseInput::KEY_BACKWARD = cfg.keyBackward;
+	KeyboardMouseInput::KEY_LEFT = cfg.keyLeft;
+	KeyboardMouseInput::KEY_RIGHT = cfg.keyRight;
+	KeyboardMouseInput::KEY_JUMP = cfg.keyJump;
+	KeyboardMouseInput::KEY_SNEAK = cfg.keySneak;
+	KeyboardMouseInput::KEY_SPRINT = cfg.keySprint;
+	KeyboardMouseInput::KEY_INVENTORY = cfg.keyInventory;
+	KeyboardMouseInput::KEY_DROP = cfg.keyDrop;
+	KeyboardMouseInput::KEY_CHAT = cfg.keyChat;
+	KeyboardMouseInput::KEY_CRAFTING = cfg.keyCrafting;
+	KeyboardMouseInput::KEY_CONFIRM = cfg.keyConfirm;
+	KeyboardMouseInput::KEY_PAUSE = cfg.keyPause;
+	KeyboardMouseInput::KEY_THIRD_PERSON = cfg.keyThirdPerson;
+	KeyboardMouseInput::KEY_DEBUG_INFO = cfg.keyDebugInfo;
+	KeyboardMouseInput::KEY_VOICE = cfg.keyVoice;
+	#endif
+
 	memset(m_keyDown, 0, sizeof(m_keyDown));
 	memset(m_keyDownPrev, 0, sizeof(m_keyDownPrev));
 	memset(m_keyPressedAccum, 0, sizeof(m_keyPressedAccum));
@@ -49,6 +72,7 @@ void KeyboardMouseInput::Init()
 	m_mouseDeltaAccumY = 0;
 	m_mouseWheel = 0;
 	m_mouseWheelAccum = 0;
+	m_mouseWheelRemainder = 0;
 	m_mouseGrabbed = false;
 	m_cursorHiddenForUI = false;
 	m_windowFocused = true;
@@ -86,6 +110,7 @@ void KeyboardMouseInput::ClearAllState()
 	m_mouseDeltaAccumY = 0;
 	m_mouseWheel = 0;
 	m_mouseWheelAccum = 0;
+	m_mouseWheelRemainder = 0;
 	m_hadRawMouseInput = false;
 }
 
@@ -109,10 +134,14 @@ void KeyboardMouseInput::Tick()
 	m_mouseDeltaAccumX = 0;
 	m_mouseDeltaAccumY = 0;
 
-	m_mouseWheel = m_mouseWheelAccum;
-	m_mouseWheelAccum = 0;
 
-	m_hasInput = (m_mouseDeltaX != 0 || m_mouseDeltaY != 0 || m_mouseWheel != 0 || m_hadRawMouseInput);
+	int wheelTotal = m_mouseWheelRemainder + m_mouseWheelAccum;
+	int wheelSteps = wheelTotal / WHEEL_DELTA;
+	m_mouseWheelRemainder = wheelTotal - (wheelSteps * WHEEL_DELTA);
+	m_mouseWheelAccum = 0;
+	m_mouseWheel += wheelSteps;
+
+	m_hasInput = (m_mouseDeltaX != 0 || m_mouseDeltaY != 0 || wheelSteps != 0 || m_hadRawMouseInput);
 	m_hadRawMouseInput = false;
 	if (!m_hasInput)
 	{
@@ -268,6 +297,10 @@ void KeyboardMouseInput::SetMouseGrabbed(bool grabbed)
 		while (ShowCursor(TRUE) < 0) {}
 		ClipCursor(NULL);
 	}
+
+	m_mouseWheel = 0;
+	m_mouseWheelAccum = 0;
+	m_mouseWheelRemainder = 0;
 }
 
 void KeyboardMouseInput::SetCursorHiddenForUI(bool hidden)

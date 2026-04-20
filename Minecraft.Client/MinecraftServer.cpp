@@ -37,6 +37,11 @@
 #include "GameRenderer.h"
 #ifdef _WINDOWS64
 #include "Windows64/Network/WinsockNetLayer.h"
+#elif defined(WITH_SERVER_CODE)
+#include "../Minecraft.Server/Linux/PosixNetLayer.h"
+#endif
+#if defined(__linux__) || defined(_WIN32)
+#include "../Minecraft.Server/Core/ServerThreadPool.h"
 #endif
 #include "../Minecraft.World/ThreadName.h"
 #include "../Minecraft.World/IntCache.h"
@@ -69,6 +74,7 @@ __int64 MinecraftServer::setTimeOfDay = 0;
 bool	MinecraftServer::m_bPrimaryPlayerSignedOut=false;
 bool	MinecraftServer::s_bServerHalted=false;
 bool	MinecraftServer::s_bSaveOnExitAnswered=false;
+bool	MinecraftServer::s_bDeleteCurrentSaveOnNoSaveExit=false;
 int MinecraftServer::s_slowQueuePlayerIndex = 0;
 int MinecraftServer::s_slowQueueLastTime = 0;
 bool MinecraftServer::s_slowQueuePacketSent = false;
@@ -517,6 +523,7 @@ bool MinecraftServer::loadLevel(LevelStorageSource *storageSource, const wstring
 	}
 	app.SetGameHostOption( eGameHostOption_HasBeenInCreative, gameType == GameType::CREATIVE || levels[0]->getHasBeenInCreative() );
 	app.SetGameHostOption( eGameHostOption_Structures, levels[0]->isGenerateMapFeatures() );
+	WinsockNetLayer::UpdateAdvertiseGameHostSettings(app.GetGameHostOption(eGameHostOption_All));
 
 	if( s_bServerHalted || !g_NetworkManager.IsInSession() ) return false;
 
@@ -881,6 +888,7 @@ bool MinecraftServer::IsSuspending()
 
 void MinecraftServer::stopServer()
 {
+	const bool shouldDeleteCurrentSaveOnNoSaveExit = (!m_saveOnExit && s_bDeleteCurrentSaveOnNoSaveExit);
 
 	// 4J-PB - need to halt the rendering of the data, since we're about to remove it
 #ifdef __PS3__
@@ -975,6 +983,40 @@ void MinecraftServer::stopServer()
 	players = NULL;
 	delete settings;
 	settings = NULL;
+
+	if( shouldDeleteCurrentSaveOnNoSaveExit )
+	{
+		bool deleteRes = false;
+		char uniqueFilename[32] = { 0 };
+
+		if (StorageManager.GetSaveUniqueFilename(uniqueFilename))
+		{
+			StorageManager.GetSavesInfo(ProfileManager.GetPrimaryPad(), NULL, NULL, "save");
+			PSAVE_DETAILS pSaveDetails = StorageManager.ReturnSavesInfo();
+			if (pSaveDetails != NULL)
+			{
+				const size_t uniqueLen = strlen(uniqueFilename);
+				for (int i = 0; i < pSaveDetails->iSaveC; ++i)
+				{
+					const char *saveFilename = pSaveDetails->SaveInfoA[i].UTF8SaveFilename;
+					const size_t saveLen = strlen(saveFilename);
+					if (saveLen >= uniqueLen && strcmp(saveFilename + (saveLen - uniqueLen), uniqueFilename) == 0)
+					{
+						StorageManager.DeleteSaveData(&pSaveDetails->SaveInfoA[i], NULL, NULL);
+						deleteRes = true;
+						break;
+					}
+				}
+			}
+		}
+
+		app.DebugPrintf("No-save exit cleanup for new world: %s\n", deleteRes ? "success" : "failed");
+	}
+	s_bDeleteCurrentSaveOnNoSaveExit = false;
+
+#if defined(WITH_SERVER_CODE) || defined(_WIN32)
+	ServerThreadPool::Shutdown();
+#endif
 
 	g_NetworkManager.ServerStopped();
 }
@@ -1516,24 +1558,89 @@ void MinecraftServer::tick()
 
     for (unsigned int i = 0; i < levels.length; i++)
 	{
-//        if (i == 0 || settings->getBoolean(L"allow-nether", true))		// 4J removed - we always have nether
-		{
             ServerLevel *level = levels[i];
-
-			// 4J Stu - We set the levels difficulty based on the minecraft options
-			level->difficulty = app.GetGameHostOption(eGameHostOption_Difficulty); //pMinecraft->options->difficulty;
-
+			level->difficulty = app.GetGameHostOption(eGameHostOption_Difficulty);
 #if DEBUG_SERVER_DONT_SPAWN_MOBS
 			level->setSpawnSettings(false, false);
 #else
 			level->setSpawnSettings(level->difficulty > 0 && !Minecraft::GetInstance()->isTutorial(), animals);
 #endif
-
             if (tickCount % 20 == 0)
 			{
                 players->broadcastAll( shared_ptr<SetTimePacket>( new SetTimePacket(level->getTime() ) ), level->dimension->id);
             }
-// #ifndef __PS3__
+    }
+
+#if defined(WITH_SERVER_CODE) || defined(_WIN32)
+	if (!ServerThreadPool::IsInitialized())
+		ServerThreadPool::Initialize();
+
+	struct DimensionTickData
+	{
+		ServerLevel *level;
+		PlayerList *players;
+	};
+
+	int activeLevels = 0;
+	DimensionTickData dimData[3];
+	for (unsigned int i = 0; i < levels.length && i < 3; i++)
+	{
+		dimData[i].level = levels[i];
+		dimData[i].players = players;
+		activeLevels++;
+	}
+
+	if (activeLevels > 1 && ServerThreadPool::IsInitialized())
+	{
+		for (int i = 0; i < activeLevels; i++)
+		{
+			try
+			{
+				((Level *)dimData[i].level)->tick();
+			}
+			catch (...)
+			{
+			}
+		}
+
+		ServerThreadPool::ParallelFor(0, activeLevels, [](int idx, void *param) {
+			DimensionTickData *data = (DimensionTickData *)param;
+			ServerLevel *level = data[idx].level;
+
+			try
+			{
+				while (level->updateLights())
+					;
+			}
+			catch (...)
+			{
+			}
+		}, dimData);
+
+		for (int i = 0; i < activeLevels; i++)
+		{
+			ServerLevel *level = dimData[i].level;
+			PlayerList *pPlayers = dimData[i].players;
+
+			try
+			{
+				if ((pPlayers->getPlayerCount(level) > 0) || (level->hasEntitiesToRemove()))
+					level->tickEntities();
+
+				level->getTracker()->tick();
+			}
+			catch (...)
+			{
+			}
+		}
+	}
+	else
+#endif
+	{
+		for (unsigned int i = 0; i < levels.length; i++)
+		{
+			ServerLevel *level = levels[i];
+
 			static __int64 stc = 0;
 			__int64 st0 = System::currentTimeMillis();
 			PIXBeginNamedEvent(0,"Level tick %d",i);
@@ -1543,7 +1650,7 @@ void MinecraftServer::tick()
 			PIXBeginNamedEvent(0,"Update lights %d",i);
 			// 4J - used to be in a while loop, but we don't want the server locking up for a big chunk of time (could end up trying to process 1,000,000 lights...)
 			// Instead call this once, which will try and process up to 2000 lights per tick
-//			printf("lights: %d\n",level->getLightsToUpdate());
+			//printf("lights: %d\n",level->getLightsToUpdate());
             while(level->updateLights() )
 				;
 			__int64 st2 = System::currentTimeMillis();
@@ -1556,7 +1663,7 @@ void MinecraftServer::tick()
 			if( ( players->getPlayerCount(level) > 0) || ( level->hasEntitiesToRemove() ) )
 			{
 #ifdef __PSVITA__
-				// AP - the PlayerList->viewDistance initially starts out at 3 to make starting a level speedy
+// AP - the PlayerList->viewDistance initially starts out at 3 to make starting a level speedy
 				// the problem with this is that spawned monsters are always generated on the edge of the known map
 				// which means they wont process (unless they are surrounded by 2 visible chunks). This means
 				// they wont checkDespawn so they are NEVER removed which results in monsters not spawning.
@@ -1575,16 +1682,15 @@ void MinecraftServer::tick()
 			PIXEndNamedEvent();
 
 			__int64 st3 = System::currentTimeMillis();
-//			printf(">>>>>>>>>>>>>>>>>>>>>> Tick %d %d %d : %d\n", st1 - st0, st2 - st1, st3 - st2, st0 - stc );
 			stc = st0;
-// #endif// __PS3__
-        }
-    }
-	Entity::tickExtraWandering();	// 4J added
+		}
+	}
+	Entity::tickExtraWandering();
 
-#ifdef WITH_SERVER_CODE
+#if defined(WITH_SERVER_CODE) || defined(_WIN32)
 	g_NetworkManager.DoWork();
 	WinsockNetLayer::FlushPendingData();
+	WinsockNetLayer::FlushSendBuffers();
 #endif
 
 	PIXBeginNamedEvent(0,"Connection tick");

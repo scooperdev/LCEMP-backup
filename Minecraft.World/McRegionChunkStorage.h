@@ -17,6 +17,7 @@ private:
 	static CRITICAL_SECTION		cs_memory;
 
 	unordered_map<__int64, byteArray> m_entityData;
+	CRITICAL_SECTION m_csEntityData;
 
 	static std::deque<DataOutputStream *> s_chunkDataQueue;
 	static int s_runningThreadCount;

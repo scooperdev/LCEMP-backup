@@ -29,10 +29,23 @@ bool g_voiceChatEnabled = true;
 #include "ServerConnection.h"
 #include "../Minecraft.World/GenericStats.h"
 #include "../Minecraft.World/JavaMath.h"
+#include "../Minecraft.World/StringHelpers.h"
 
 // 4J Added
 #include "../Minecraft.World/net.minecraft.world.item.crafting.h"
 #include "Options.h"
+
+#ifdef WITH_SERVER_CODE
+#include "../Minecraft.Server/Commands/ServerCommands.h"
+#endif
+
+namespace
+{
+	bool IsTextChatDisabledForSession()
+	{
+		return app.GetGameHostOption(eGameHostOption_ChatDisabled) != 0;
+	}
+}
 
 Random PlayerConnection::random;
 
@@ -156,7 +169,16 @@ void PlayerConnection::handlePlayerInput(shared_ptr<PlayerInputPacket> packet)
 
 void PlayerConnection::handleMovePlayer(shared_ptr<MovePlayerPacket> packet)
 {
+	if (done || player == NULL || player->gameMode == NULL)
+	{
+		return;
+	}
+
 	ServerLevel *level = server->getLevel(player->dimension);
+	if (level == NULL)
+	{
+		return;
+	}
 
 	didTick = true;
 	if(synched) m_bHasClientTickedOnce = true;
@@ -591,7 +613,11 @@ void PlayerConnection::handleUseItem(shared_ptr<UseItemPacket> packet)
 void PlayerConnection::onDisconnect(DisconnectPacket::eDisconnectReason reason, void *reasonObjects)
 {
 	EnterCriticalSection(&done_cs);
-	if( done ) return;
+	if( done )
+	{
+		LeaveCriticalSection(&done_cs);
+		return;
+	}
 //    logger.info(player.name + " lost connection: " + reason);
 	// 4J-PB - removed, since it needs to be localised in the language the client is in
 	//server->players->broadcastAll( shared_ptr<ChatPacket>( new ChatPacket(L"ï¿½e" + player->name + L" left the game.") ) );
@@ -661,45 +687,73 @@ void PlayerConnection::handleSetCarriedItem(shared_ptr<SetCarriedItemPacket> pac
 
 void PlayerConnection::handleChat(shared_ptr<ChatPacket> packet)
 {
-	// 4J - TODO
-#if 0
-	wstring message = packet->message;
-	if (message.length() > SharedConstants::maxChatLength)
+	if (IsTextChatDisabledForSession())
 	{
-		disconnect(L"Chat message too long");
+		send(shared_ptr<ChatPacket>(new ChatPacket(L"Chat is disabled on this server.")));
 		return;
 	}
-	message = message.trim();
-	for (int i = 0; i < message.length(); i++)
+
+	wstring rawMessage;
+	if (!packet->m_stringArgs.empty())
 	{
-		if (SharedConstants.acceptableLetters.indexOf(message.charAt(i)) < 0 && (int) message.charAt(i) < 32)
+		rawMessage = packet->m_stringArgs[0];
+	}
+
+	// ported from java 1.3.1 NetServerHandler: reject overlong chat payloads.
+	if (rawMessage.length() > SharedConstants::maxChatLength)
+	{
+		disconnect(DisconnectPacket::eDisconnect_Kicked);
+		return;
+	}
+
+	wstring message = trimString(rawMessage);
+
+	// ported from java 1.3.1 ChatAllowedCharacters.isAllowedCharacter(c)
+	for (unsigned int i = 0; i < message.length(); i++)
+	{
+		const wchar_t ch = message[i];
+		if (ch == 0x00A7 || (SharedConstants::acceptableLetters.find(ch) == wstring::npos && ch <= L' '))
 		{
-			disconnect(L"Illegal characters in chat");
+			disconnect(DisconnectPacket::eDisconnect_Kicked);
 			return;
 		}
 	}
 
-	if (message.startsWith("/"))
+	if (!message.empty() && message[0] == L'/')
 	{
 		handleCommand(message);
-	} else {
-		message = "<" + player.name + "> " + message;
-		logger.info(message);
-		server.players.broadcastAll(new ChatPacket(message));
 	}
-	chatSpamTickCount += SharedConstants::TICKS_PER_SECOND;
-	if (chatSpamTickCount > SharedConstants::TICKS_PER_SECOND * 10)
+	else
 	{
-		disconnect("disconnect.spam");
+		wstring formatted = L"<" + player->name + L"> " + message;
+		app.DebugPrintf("%ls", formatted.c_str());
+		server->getPlayers()->broadcastAll(shared_ptr<ChatPacket>(new ChatPacket(formatted)));
 	}
-#endif
+
+	chatSpamTickCount += SharedConstants::TICKS_PER_SECOND;
+	if (chatSpamTickCount > SharedConstants::TICKS_PER_SECOND * 10 && !server->getPlayers()->isOp(player) && !server->getPlayers()->isOp(player->name))
+	{
+		disconnect(DisconnectPacket::eDisconnect_Kicked);
+	}
 }
 
 void PlayerConnection::handleCommand(const wstring& message)
 {
-	// 4J - TODO
-#if 0
-	server.getCommandDispatcher().performCommand(player, message);
+	if (IsTextChatDisabledForSession())
+	{
+		return;
+	}
+
+	const bool canUseCommands = server->getPlayers()->isOp(player) || server->getPlayers()->isOp(player->name);
+	if (!canUseCommands && message != L"/seed")
+	{
+		return;
+	}
+
+	app.DebugPrintf("%ls issued server command: %ls", player->name.c_str(), message.c_str());
+
+#ifdef WITH_SERVER_CODE
+	HandleServerCommand(message, this, server);
 #endif
 }
 
@@ -764,14 +818,12 @@ int PlayerConnection::countDelayedPackets()
 
 void PlayerConnection::info(const wstring& string)
 {
-	// 4J-PB - removed, since it needs to be localised in the language the client is in
-	//send( shared_ptr<ChatPacket>( new ChatPacket(L"ï¿½7" + string) ) );
+	send(shared_ptr<ChatPacket>(new ChatPacket(string)));
 }
 
 void PlayerConnection::warn(const wstring& string)
 {
-	// 4J-PB - removed, since it needs to be localised in the language the client is in
-	//send( shared_ptr<ChatPacket>( new ChatPacket(L"ï¿½9" + string) ) );
+	send(shared_ptr<ChatPacket>(new ChatPacket(string)));
 }
 
 wstring PlayerConnection::getConsoleName()

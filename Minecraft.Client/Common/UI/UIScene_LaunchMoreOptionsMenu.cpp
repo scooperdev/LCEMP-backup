@@ -407,7 +407,11 @@ int UIScene_LaunchMoreOptionsMenu::KeyboardCompleteSeedCallback(LPVOID lpParam,b
 	{
 		uint16_t pchText[128];
 		ZeroMemory(pchText, 128 * sizeof(uint16_t) );
-		InputManager.GetText(pchText);
+		#ifdef _WINDOWS64
+			Win64InGameKeyboard::GetText(pchText);
+		#else
+			InputManager.GetText(pchText);
+		#endif
 		pClass->m_editSeed.setLabel((wchar_t *)pchText);
 		pClass->m_params->seed = (wchar_t *)pchText;
 	}
@@ -423,7 +427,9 @@ void UIScene_LaunchMoreOptionsMenu::handlePress(F64 controlId, F64 childId)
 	case eControl_EditSeed:
 		{
 			m_bIgnoreInput=true;
-#ifdef __PS3__
+	#ifdef _WINDOWS64
+			Win64InGameKeyboard::Request(app.GetString(IDS_CREATE_NEW_WORLD_SEED), m_editSeed.getLabel(), (DWORD)0, 60, &UIScene_LaunchMoreOptionsMenu::KeyboardCompleteSeedCallback, this, C_4JInput::EKeyboardMode_Default);
+	#elif defined(__PS3__)
 			int language = XGetLanguage();
 			switch(language)
 			{

@@ -9545,7 +9545,7 @@ void* MicroProfileTraceThread(void* unused)
 		MicroProfileWin32ContextSwitchShared* pShared = 0;
 		char Filename[512];
 		time_t t = time(NULL);
-		_snprintf_s(Filename, sizeof(Filename), "%s_%d", MICROPROFILE_FILEMAPPING, (int)t);
+		snprintf(Filename, sizeof(Filename), "%s_%d", MICROPROFILE_FILEMAPPING, (int)t);
 
 		HANDLE hMemory = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(MicroProfileWin32ContextSwitchShared), Filename);
 		if(hMemory != NULL)

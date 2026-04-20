@@ -15,6 +15,7 @@ struct KBMConfig
 	int keySprint;
 	int keyInventory;
 	int keyDrop;
+	int keyChat;
 	int keyCrafting;
 	int keyConfirm;
 	int keyPause;

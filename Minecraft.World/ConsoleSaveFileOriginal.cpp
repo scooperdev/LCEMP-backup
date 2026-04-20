@@ -810,7 +810,8 @@ void ConsoleSaveFileOriginal::Flush(bool autosave, bool updateThumbnail )
 
 int ConsoleSaveFileOriginal::SaveSaveDataCallback(LPVOID lpParam,bool bRes)
 {
-	ConsoleSaveFile *pClass=(ConsoleSaveFile *)lpParam;
+	(void)lpParam;
+	(void)bRes;
 
 	return 0;
 }

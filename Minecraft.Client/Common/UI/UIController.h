@@ -136,6 +136,7 @@ private:
 	C4JThread *m_reloadSkinThread;
 	bool m_navigateToHomeOnReload;
 	int m_accumulatedTicks;
+	int m_windowsMouseWheelForMenu;
 
 	D3D11_RECT m_customRenderingClearRect;
 
