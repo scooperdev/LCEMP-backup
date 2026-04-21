@@ -275,6 +275,9 @@ Minecraft.Client/redist64/*
 !Minecraft.Client/music/
 !Minecraft.Client/music/**
 
+!Minecraft.Client/Common/DLC/
+!Minecraft.Client/Common/DLC/**
+
 !Minecraft.Client/Common/Media/
 !Minecraft.Client/Common/Media/**
 

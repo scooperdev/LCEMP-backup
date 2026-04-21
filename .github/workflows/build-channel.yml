@@ -31,6 +31,7 @@ permissions:
 
 env:
   BUILD_TYPE: Release
+  WINDOWS_PLATFORM_TOOLSET: v110
 
 jobs:
   windows64_client:
@@ -48,6 +49,34 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Ensure VS2012 toolset (v110)
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+          if (-not (Test-Path $vswhere)) {
+            throw "vswhere.exe not found on runner."
+          }
+
+          $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          if (-not $installPath) {
+            throw "No Visual Studio instance with MSBuild found."
+          }
+
+          $v110 = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.v110.x86.x64 -property installationPath
+          if (-not $v110) {
+            $installer = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vs_installer.exe"
+            if (-not (Test-Path $installer)) {
+              throw "Visual Studio Installer not found. Cannot install v110 toolset."
+            }
+
+            & $installer modify --installPath "$installPath" --add Microsoft.VisualStudio.Component.VC.v110.x86.x64 --passive --norestart
+          }
+
+          $v110 = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.v110.x86.x64 -property installationPath
+          if (-not $v110) {
+            throw "VS2012 toolset (v110) is not available on this runner after install attempt."
+          }
+
       - name: Preflight Windows client dependencies
         shell: pwsh
         run: |
@@ -58,7 +87,9 @@ jobs:
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Storage_r.lib",
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Profile_r.lib",
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Render_PC.lib",
-            "Minecraft.Client\\Durango\\Sound\\Minecraft.msscmp"
+            "Minecraft.Client\\Durango\\Sound\\Minecraft.msscmp",
+            "Minecraft.Client\\Common\\DLC\\DLCManager.h",
+            "Minecraft.Client\\Common\\DLC\\DLCFile.cpp"
           )
 
           $requiredDirs = @(
@@ -93,7 +124,7 @@ jobs:
             /t:Build `
             /p:Configuration=Release `
             /p:Platform=x64 `
-            /p:PlatformToolset=v143 `
+            /p:PlatformToolset=${{ env.WINDOWS_PLATFORM_TOOLSET }} `
             /p:PreferredToolArchitecture=x64 `
             /p:UseMultiToolTask=true `
             /p:CL_MPCount=8 `
@@ -225,6 +256,24 @@ jobs:
           fetch-depth: 1
           submodules: recursive
 
+      - name: Preflight Linux shared sources
+        run: |
+          required=(
+            "./Minecraft.Client/Common/DLC/DLCFile.cpp"
+            "./Minecraft.Client/Common/DLC/DLCManager.h"
+          )
+          missing=()
+          for f in "${required[@]}"; do
+            if [ ! -f "$f" ]; then
+              missing+=("$f")
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf 'Missing required shared source files:\n' >&2
+            printf '%s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
       - name: Install build tools
         run: |
           sudo apt-get update
@@ -281,13 +330,43 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Ensure VS2012 toolset (v110)
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+          if (-not (Test-Path $vswhere)) {
+            throw "vswhere.exe not found on runner."
+          }
+
+          $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          if (-not $installPath) {
+            throw "No Visual Studio instance with MSBuild found."
+          }
+
+          $v110 = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.v110.x86.x64 -property installationPath
+          if (-not $v110) {
+            $installer = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vs_installer.exe"
+            if (-not (Test-Path $installer)) {
+              throw "Visual Studio Installer not found. Cannot install v110 toolset."
+            }
+
+            & $installer modify --installPath "$installPath" --add Microsoft.VisualStudio.Component.VC.v110.x86.x64 --passive --norestart
+          }
+
+          $v110 = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.v110.x86.x64 -property installationPath
+          if (-not $v110) {
+            throw "VS2012 toolset (v110) is not available on this runner after install attempt."
+          }
+
       - name: Preflight Windows server dependencies
         shell: pwsh
         run: |
           $required = @(
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Storage.lib",
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Profile_r.lib",
-            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Render_PC.lib"
+            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Render_PC.lib",
+            "Minecraft.Client\\Common\\DLC\\DLCManager.h",
+            "Minecraft.Client\\Common\\DLC\\DLCFile.cpp"
           )
 
           $missing = @($required | Where-Object { -not (Test-Path $_) })
@@ -304,7 +383,7 @@ jobs:
             /t:Build `
             /p:Configuration=Release `
             /p:Platform=x64 `
-            /p:PlatformToolset=v143 `
+            /p:PlatformToolset=${{ env.WINDOWS_PLATFORM_TOOLSET }} `
             /p:PreferredToolArchitecture=x64 `
             /p:UseMultiToolTask=true `
             /p:CL_MPCount=8 `
