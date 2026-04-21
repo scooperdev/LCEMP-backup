@@ -54,6 +54,7 @@ jobs:
         run: |
           $requiredFiles = @(
             "Minecraft.Client\\Windows64\\Iggy\\lib\\iggy_w64.lib",
+            "Minecraft.Client\\Windows64\\Iggy\\gdraw\\gdraw_d3d11.h",
             "Minecraft.Client\\Windows64\\Miles\\lib\\mss64.lib",
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Input_r.lib",
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Storage_r.lib",
@@ -313,6 +314,7 @@ jobs:
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Storage.lib",
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Profile_r.lib",
             "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Render_PC.lib",
+            "Minecraft.Client\\Windows64\\Iggy\\gdraw\\gdraw_d3d11.h",
             "Minecraft.Client\\Windows64\\Sentient\\SentientTelemetryCommon.h",
             "Minecraft.Client\\Windows64\\Sentient\\MinecraftTelemetry.h",
             "Minecraft.Client\\Common\\DLC\\DLCManager.h",

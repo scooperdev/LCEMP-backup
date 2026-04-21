@@ -238,6 +238,8 @@ Minecraft.Client/Windows64/4JLibs/libs/*
 Minecraft.Client/Windows64/Iggy/*
 !Minecraft.Client/Windows64/Iggy/include/
 !Minecraft.Client/Windows64/Iggy/include/*.h
+!Minecraft.Client/Windows64/Iggy/gdraw/
+!Minecraft.Client/Windows64/Iggy/gdraw/**
 !Minecraft.Client/Windows64/Iggy/lib/
 Minecraft.Client/Windows64/Iggy/lib/*
 !Minecraft.Client/Windows64/Iggy/lib/*.lib
