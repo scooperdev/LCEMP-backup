@@ -22,7 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#if !defined(__linux__)
 #include "stdafx.h"
+#endif
 #include "STO_DLC.h"
 #include "STO_Main.h"
 

@@ -123,11 +123,25 @@ jobs:
         shell: pwsh
         run: |
           $outRoots = @(
+            ".\\Minecraft.Client\\x64\\Release",
+            ".\\Minecraft.Client\\x64_Release",
             ".\\x64\\Release",
             ".\\x64_Release"
           )
 
-          $root = $outRoots | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $root = $outRoots | Where-Object {
+            Test-Path (Join-Path $_ "Minecraft.Client.exe")
+          } | Select-Object -First 1
+
+          if (-not $root) {
+            $fallback = Get-ChildItem -Path . -Filter "Minecraft.Client.exe" -Recurse -File -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+
+            if ($fallback) {
+              $root = $fallback.DirectoryName
+            }
+          }
+
           if (-not $root) {
             throw "Could not locate Windows client output directory."
           }
@@ -379,11 +393,26 @@ jobs:
         shell: pwsh
         run: |
           $outRoots = @(
+            ".\\Minecraft.Server\\x64_Server_Release",
+            ".\\Minecraft.Server\\x64\\Release",
+            ".\\Minecraft.Server\\x64_Release",
             ".\\x64_Server_Release",
             ".\\x64_Release"
           )
 
-          $root = $outRoots | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $root = $outRoots | Where-Object {
+            Test-Path (Join-Path $_ "Minecraft.Server.exe")
+          } | Select-Object -First 1
+
+          if (-not $root) {
+            $fallback = Get-ChildItem -Path . -Filter "Minecraft.Server.exe" -Recurse -File -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+
+            if ($fallback) {
+              $root = $fallback.DirectoryName
+            }
+          }
+
           if (-not $root) {
             throw "Could not locate Windows dedicated server output directory."
           }

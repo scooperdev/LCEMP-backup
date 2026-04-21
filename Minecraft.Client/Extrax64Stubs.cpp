@@ -46,7 +46,9 @@
 #if !defined(__PS3__) && !defined(__ORBIS__) && !defined(__PSVITA__)
 #ifdef _WINDOWS64
 //C4JStorage StorageManager;
-//C_4JProfile ProfileManager;
+#if defined(__linux__)
+C_4JProfile ProfileManager;
+#endif
 #endif
 #endif // __PS3__
 CSentientManager SentientManager;
