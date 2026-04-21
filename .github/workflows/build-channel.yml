@@ -56,10 +56,8 @@ jobs:
             "Minecraft.Client\\Windows64\\Iggy\\lib\\iggy_w64.lib",
             "Minecraft.Client\\Windows64\\Iggy\\gdraw\\gdraw_d3d11.h",
             "Minecraft.Client\\Windows64\\Miles\\lib\\mss64.lib",
-            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Input_r.lib",
-            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Storage_r.lib",
-            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Profile_r.lib",
-            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Render_PC.lib",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Input\\4J_Input.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Profile\\4J_Profile.cpp",
             "Minecraft.Client\\Durango\\Sound\\Minecraft.msscmp",
             "Minecraft.Client\\Windows64\\Sentient\\SentientTelemetryCommon.h",
             "Minecraft.Client\\Windows64\\Sentient\\MinecraftTelemetry.h",
@@ -326,9 +324,11 @@ jobs:
         shell: pwsh
         run: |
           $required = @(
-            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Storage.lib",
-            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Profile_r.lib",
-            "Minecraft.Client\\Windows64\\4JLibs\\libs\\4J_Render_PC.lib",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Storage\\4J_Storage.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Storage\\STO_SaveGame.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Profile\\4J_Profile.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Render\\4J_Render.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Render\\libpng\\png.c",
             "Minecraft.Client\\Windows64\\Iggy\\gdraw\\gdraw_d3d11.h",
             "Minecraft.Client\\Windows64\\Sentient\\SentientTelemetryCommon.h",
             "Minecraft.Client\\Windows64\\Sentient\\MinecraftTelemetry.h",
@@ -338,7 +338,7 @@ jobs:
 
           $missing = @($required | Where-Object { -not (Test-Path $_) })
           if ($missing.Count -gt 0) {
-            Write-Error "Missing required Windows dedicated server libs:`n$($missing -join "`n")"
+            Write-Error "Missing required Windows dedicated server files:`n$($missing -join "`n")"
             exit 1
           }
 
