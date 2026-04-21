@@ -56,6 +56,7 @@ jobs:
             "Minecraft.Client\\Windows64\\Iggy\\lib\\iggy_w64.lib",
             "Minecraft.Client\\Windows64\\Iggy\\gdraw\\gdraw_d3d11.h",
             "Minecraft.Client\\Windows64\\Miles\\lib\\mss64.lib",
+            "Minecraft.Client\\Windows64\\Miles\\lib\\redist64\\mss64.dll",
             "Minecraft.Client\\Platform_Libs\\Dev\\Input\\4J_Input.cpp",
             "Minecraft.Client\\Platform_Libs\\Dev\\Profile\\4J_Profile.cpp",
             "Minecraft.Client\\Durango\\Sound\\Minecraft.msscmp",
@@ -153,19 +154,58 @@ jobs:
           $requiredRuntimeFiles = @(
             "Minecraft.Client.exe",
             "iggy_w64.dll",
-            "mss64.dll",
-            "XInput9_1_0.dll"
+            "mss64.dll"
           )
 
           $optionalRuntimeFiles = @(
+            "XInput9_1_0.dll",
             "Effects.msscmp",
             "kbm_config.ini"
           )
 
+          $runtimeSearchRoots = @(
+            $root
+            $outRoots
+          ) | Where-Object { $_ } | Select-Object -Unique
+
+          $runtimeCandidates = @{
+            "Minecraft.Client.exe" = @(
+              $runtimeSearchRoots | ForEach-Object { Join-Path $_ "Minecraft.Client.exe" }
+            )
+            "iggy_w64.dll" = @(
+              $runtimeSearchRoots | ForEach-Object { Join-Path $_ "iggy_w64.dll" }
+            ) + @(
+              ".\\Minecraft.Client\\Windows64\\Iggy\\lib\\redist64\\iggy_w64.dll"
+            )
+            "mss64.dll" = @(
+              $runtimeSearchRoots | ForEach-Object { Join-Path $_ "mss64.dll" }
+            ) + @(
+              ".\\Minecraft.Client\\Windows64\\Miles\\lib\\redist64\\mss64.dll",
+              ".\\Minecraft.Client\\mss64.dll"
+            )
+            "XInput9_1_0.dll" = @(
+              $runtimeSearchRoots | ForEach-Object { Join-Path $_ "XInput9_1_0.dll" }
+            ) + @(
+              (Join-Path $env:WINDIR "System32\\XInput9_1_0.dll"),
+              (Join-Path $env:WINDIR "SysWOW64\\XInput9_1_0.dll")
+            )
+            "Effects.msscmp" = @(
+              (Join-Path $root "Effects.msscmp"),
+              ".\\Minecraft.Client\\Effects.msscmp"
+            )
+            "kbm_config.ini" = @(
+              (Join-Path $root "kbm_config.ini"),
+              ".\\Minecraft.Client\\kbm_config.ini"
+            )
+          }
+
           foreach ($f in $requiredRuntimeFiles + $optionalRuntimeFiles) {
-            $p = Join-Path $root $f
-            if (Test-Path $p) {
-              Copy-Item $p $packageRoot -Force
+            $candidate = $runtimeCandidates[$f] | Where-Object {
+              $_ -and (Test-Path $_)
+            } | Select-Object -First 1
+
+            if ($candidate) {
+              Copy-Item $candidate (Join-Path $packageRoot $f) -Force
             }
           }
 
@@ -177,6 +217,16 @@ jobs:
 
           if ($missingRuntime.Count -gt 0) {
             throw "Missing required runtime files in package: $($missingRuntime -join ', ')"
+          }
+
+          $missingOptionalRuntime = @(
+            $optionalRuntimeFiles | Where-Object {
+              -not (Test-Path (Join-Path $packageRoot $_))
+            }
+          )
+
+          if ($missingOptionalRuntime.Count -gt 0) {
+            Write-Host "Optional runtime files not found: $($missingOptionalRuntime -join ', ')"
           }
 
           foreach ($dir in @("redist64", "Windows64")) {
