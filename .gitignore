@@ -259,6 +259,10 @@ Minecraft.Client/Windows64/Miles/lib/redist64/*
 !Minecraft.Client/Windows64/Miles/lib/redist64/*.asi
 !Minecraft.Client/Windows64/Miles/lib/redist64/*.flt
 
+!Minecraft.Client/Windows64/Sentient/
+Minecraft.Client/Windows64/Sentient/*
+!Minecraft.Client/Windows64/Sentient/*.h
+
 # Legacy Windows runtime filter files copied by project scripts
 !Minecraft.Client/redist64/
 Minecraft.Client/redist64/*
