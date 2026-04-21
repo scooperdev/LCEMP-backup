@@ -88,15 +88,16 @@ jobs:
       - name: Build Minecraft.Client (Release)
         shell: pwsh
         run: |
-          msbuild .\\MinecraftConsoles.sln `
+          msbuild .\\Minecraft.Client\\Minecraft.Client.vcxproj `
             /m `
-            /t:Minecraft.Client `
+            /t:Build `
             /p:Configuration=Release `
             /p:Platform=Windows64 `
             /p:PlatformToolset=v143 `
             /p:PreferredToolArchitecture=x64 `
             /p:UseMultiToolTask=true `
             /p:CL_MPCount=8 `
+            /p:BuildProjectReferences=true `
             /verbosity:minimal
 
       - name: Stage Windows64 client package
@@ -298,15 +299,16 @@ jobs:
       - name: Build Minecraft.Server (Release)
         shell: pwsh
         run: |
-          msbuild .\\MinecraftConsoles.sln `
+          msbuild .\\Minecraft.Server\\Minecraft.Server.vcxproj `
             /m `
-            /t:Minecraft.Server `
+            /t:Build `
             /p:Configuration=Release `
             /p:Platform=Windows64 `
             /p:PlatformToolset=v143 `
             /p:PreferredToolArchitecture=x64 `
             /p:UseMultiToolTask=true `
             /p:CL_MPCount=8 `
+            /p:BuildProjectReferences=true `
             /verbosity:minimal
 
       - name: Stage Windows dedicated server artifact
