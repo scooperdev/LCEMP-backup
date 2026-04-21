@@ -1,4 +1,4 @@
-name: Automated Build Channel
+name: Automated Build Channel (LCEMP)
 
 on:
   workflow_dispatch:
