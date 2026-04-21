@@ -92,7 +92,7 @@ jobs:
             /m `
             /t:Build `
             /p:Configuration=Release `
-            /p:Platform=Windows64 `
+            /p:Platform=x64 `
             /p:PlatformToolset=v143 `
             /p:PreferredToolArchitecture=x64 `
             /p:UseMultiToolTask=true `
@@ -303,7 +303,7 @@ jobs:
             /m `
             /t:Build `
             /p:Configuration=Release `
-            /p:Platform=Windows64 `
+            /p:Platform=x64 `
             /p:PlatformToolset=v143 `
             /p:PreferredToolArchitecture=x64 `
             /p:UseMultiToolTask=true `
