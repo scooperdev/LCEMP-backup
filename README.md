@@ -5,7 +5,9 @@ If you use my multiplayer code or other fixes from this repo in other LCE-based 
 
 ## notes:
   - This is NOT the full source code.
-  - You need to provide the required asset files yourself.
+  - Core Windows/common game assets used by CI snapshots are tracked in this repo.
+  - Full platform packs and console-specific content are still not fully bundled.
+  - CI build middleware/runtime files for Windows are now expected to be tracked in this repo.
   - Code quality is not perfect. I am still learning C++.
   - If you use this in other LCE-based projects, credit me.
 
@@ -88,6 +90,29 @@ example:
   - path: Minecraft.Client\xbox\small.ico
   - path: x64\Debug\iggy_w64.dll
   - path: x64\Debug\mss64.dll
+
+### GitHub CI build dependencies (tracked):
+  - path: Minecraft.Client\Windows64\4JLibs\inc\*.h
+  - path: Minecraft.Client\Windows64\4JLibs\libs\*.lib
+  - path: Minecraft.Client\Windows64\Iggy\include\*.h
+  - path: Minecraft.Client\Windows64\Iggy\lib\*.lib
+  - path: Minecraft.Client\Windows64\Iggy\lib\redist64\iggy_w64.dll
+  - path: Minecraft.Client\Windows64\Miles\include\*.h
+  - path: Minecraft.Client\Windows64\Miles\lib\*.lib
+  - path: Minecraft.Client\Windows64\Miles\lib\redist64\*.asi
+  - path: Minecraft.Client\Windows64\Miles\lib\redist64\*.flt
+  - path: Minecraft.Client\Xbox\MinecraftWindows.rc
+  - path: Minecraft.Client\Xbox\MinecraftWindows.ico
+  - path: Minecraft.Client\Xbox\small.ico
+  - path: Minecraft.Client\music\**
+  - path: Minecraft.Client\Common\Media\**
+  - path: Minecraft.Client\Common\res\**
+  - path: Minecraft.Client\Common\DummyTexturePack\**
+  - path: Minecraft.Client\Windows64Media\**
+  - path: Minecraft.Client\Durango\Sound\Minecraft.msscmp
+
+These are tracked so GitHub Actions can build Windows x64 client/server snapshots.
+Many core game assets are tracked for CI packaging, while broader platform content packs still remain external.
 
 ### install:
   - Get required assets.
