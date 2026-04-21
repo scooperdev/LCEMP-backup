@@ -6,6 +6,7 @@ on:
     - cron: "30 2 * * *"
   push:
     paths:
+      - ".github/workflows/build-channel.yml"
       - "**/*.c"
       - "**/*.cc"
       - "**/*.cpp"
