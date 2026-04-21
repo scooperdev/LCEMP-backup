@@ -94,6 +94,21 @@ jobs:
       - name: Build Minecraft.Client (Release)
         shell: pwsh
         run: |
+          msbuild .\Minecraft.World\Minecraft.World.vcxproj `
+            /m `
+            /t:Build `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:PlatformToolset=${{ env.WINDOWS_PLATFORM_TOOLSET }} `
+            /p:PreferredToolArchitecture=x64 `
+            /p:UseMultiToolTask=true `
+            /p:CL_MPCount=8 `
+            /verbosity:minimal
+
+          if (-not (Test-Path .\Minecraft.World\x64_Release\Minecraft.World.lib)) {
+            throw "Minecraft.World.lib was not produced at .\\Minecraft.World\\x64_Release\\Minecraft.World.lib"
+          }
+
           msbuild .\\Minecraft.Client\\Minecraft.Client.vcxproj `
             /m `
             /t:Build `
@@ -325,6 +340,24 @@ jobs:
           if ($missing.Count -gt 0) {
             Write-Error "Missing required Windows dedicated server libs:`n$($missing -join "`n")"
             exit 1
+          }
+
+      - name: Build Minecraft.World (Release)
+        shell: pwsh
+        run: |
+          msbuild .\Minecraft.World\Minecraft.World.vcxproj `
+            /m `
+            /t:Build `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:PlatformToolset=${{ env.WINDOWS_PLATFORM_TOOLSET }} `
+            /p:PreferredToolArchitecture=x64 `
+            /p:UseMultiToolTask=true `
+            /p:CL_MPCount=8 `
+            /verbosity:minimal
+
+          if (-not (Test-Path .\Minecraft.World\x64_Release\Minecraft.World.lib)) {
+            throw "Minecraft.World.lib was not produced at .\\Minecraft.World\\x64_Release\\Minecraft.World.lib"
           }
 
       - name: Build Minecraft.Server (Release)
