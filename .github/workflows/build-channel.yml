@@ -56,7 +56,6 @@ jobs:
             "Minecraft.Client\\Windows64\\Iggy\\lib\\iggy_w64.lib",
             "Minecraft.Client\\Windows64\\Iggy\\gdraw\\gdraw_d3d11.h",
             "Minecraft.Client\\Windows64\\Miles\\lib\\mss64.lib",
-            "Minecraft.Client\\Windows64\\Miles\\lib\\redist64\\mss64.dll",
             "Minecraft.Client\\Platform_Libs\\Dev\\Input\\4J_Input.cpp",
             "Minecraft.Client\\Platform_Libs\\Dev\\Profile\\4J_Profile.cpp",
             "Minecraft.Client\\Durango\\Sound\\Minecraft.msscmp",
