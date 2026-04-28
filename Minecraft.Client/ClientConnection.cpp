@@ -9,43 +9,46 @@
 #include "TakeAnimationParticle.h"
 #include "CritParticle.h"
 #include "User.h"
-#include "..\Minecraft.World\net.minecraft.world.level.storage.h"
-#include "..\Minecraft.World\net.minecraft.world.level.chunk.h"
-#include "..\Minecraft.World\net.minecraft.stats.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.player.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.npc.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.item.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.projectile.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.global.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.boss.enderdragon.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.monster.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.entity.h"
-#include "..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\Minecraft.World\net.minecraft.world.item.trading.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\Minecraft.World\net.minecraft.world.inventory.h"
-#include "..\Minecraft.World\net.minecraft.world.h"
-#include "..\Minecraft.World\net.minecraft.world.level.saveddata.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\net.minecraft.world.effect.h"
-#include "..\Minecraft.World\net.minecraft.world.food.h"
-#include "..\Minecraft.World\SharedConstants.h"
-#include "..\Minecraft.World\AABB.h"
-#include "..\Minecraft.World\Pos.h"
-#include "..\Minecraft.World\Socket.h"
+#include "../Minecraft.World/net.minecraft.world.level.storage.h"
+#include "../Minecraft.World/net.minecraft.world.level.chunk.h"
+#include "../Minecraft.World/net.minecraft.stats.h"
+#include "../Minecraft.World/net.minecraft.world.entity.h"
+#include "../Minecraft.World/net.minecraft.world.entity.player.h"
+#include "../Minecraft.World/net.minecraft.world.entity.npc.h"
+#include "../Minecraft.World/net.minecraft.world.entity.item.h"
+#include "../Minecraft.World/net.minecraft.world.entity.projectile.h"
+#include "../Minecraft.World/net.minecraft.world.entity.global.h"
+#include "../Minecraft.World/net.minecraft.world.entity.boss.enderdragon.h"
+#include "../Minecraft.World/net.minecraft.world.entity.monster.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.entity.h"
+#include "../Minecraft.World/net.minecraft.world.item.h"
+#include "../Minecraft.World/net.minecraft.world.item.trading.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../Minecraft.World/net.minecraft.world.inventory.h"
+#include "../Minecraft.World/net.minecraft.world.h"
+#include "../Minecraft.World/net.minecraft.world.level.saveddata.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/net.minecraft.world.effect.h"
+#include "../Minecraft.World/net.minecraft.world.food.h"
+#include "../Minecraft.World/SharedConstants.h"
+#include "../Minecraft.World/AABB.h"
+#include "../Minecraft.World/Pos.h"
+#include "../Minecraft.World/Socket.h"
 #include "Minecraft.h"
 #include "ProgressRenderer.h"
 #include "LevelRenderer.h"
 #include "Options.h"
 #include "MinecraftServer.h"
 #include "ClientConstants.h"
-#include "..\Minecraft.World\SoundTypes.h"
+#include "../Minecraft.World/SoundTypes.h"
 #include "TexturePackRepository.h"
 #ifdef _XBOX
-#include "Common\XUI\XUI_Scene_Trading.h"
+#include "Common/XUI/XUI_Scene_Trading.h"
 #else
-#include "Common\UI\UI.h"
+#include "Common/UI/UI.h"
+#endif
+#if defined(_WINDOWS64) && !defined(_DEDICATED_SERVER)
+#include "Windows64/Audio/VoiceChat.h"
 #endif
 #ifdef __PS3__
 #include "PS3/Network/SonyVoiceChat.h"
@@ -53,13 +56,13 @@
 #include "DLCTexturePack.h"
 
 #ifdef _WINDOWS64
-#include "Xbox\Network\NetworkPlayerXbox.h"
-#include "Common\Network\PlatformNetworkManagerStub.h"
+#include "Xbox/Network/NetworkPlayerXbox.h"
+#include "Common/Network/PlatformNetworkManagerStub.h"
 #endif
 
 #ifdef _DURANGO
-#include "..\Minecraft.World\DurangoStats.h"
-#include "..\Minecraft.World\GenericStats.h"
+#include "../Minecraft.World/DurangoStats.h"
+#include "../Minecraft.World/GenericStats.h"
 #endif
 
 ClientConnection::ClientConnection(Minecraft *minecraft, const wstring& ip, int port)
@@ -3180,6 +3183,37 @@ void ClientConnection::handleSoundEvent(shared_ptr<LevelSoundPacket> packet)
 
 void ClientConnection::handleCustomPayload(shared_ptr<CustomPayloadPacket> customPayloadPacket)
 {
+#if defined(_WINDOWS64) && !defined(_DEDICATED_SERVER)
+	if (customPayloadPacket->identifier == L"MC|VoiceCfg")
+	{
+		if (customPayloadPacket->data.data && customPayloadPacket->data.length >= 1)
+		{
+			bool enabled = (customPayloadPacket->data.data[0] != 0);
+			if (enabled && !VoiceChat::isEnabled())
+			{
+				VoiceChat::init();
+				VoiceChat::setEnabled(true);
+			}
+			else if (!enabled && VoiceChat::isEnabled())
+			{
+				VoiceChat::setEnabled(false);
+				VoiceChat::shutdown();
+			}
+		}
+		return;
+	}
+	if (customPayloadPacket->identifier == L"MC|Voice")
+	{
+		if (customPayloadPacket->data.data && customPayloadPacket->data.length > 1)
+		{
+			unsigned char senderSmallId = (unsigned char)customPayloadPacket->data.data[0];
+			VoiceChat::onVoiceReceived(senderSmallId,
+				(const char *)(customPayloadPacket->data.data + 1),
+				customPayloadPacket->data.length - 1);
+		}
+		return;
+	}
+#endif
 	if (CustomPayloadPacket::TRADER_LIST_PACKET.compare(customPayloadPacket->identifier) == 0)
 	{
 		ByteArrayInputStream bais(customPayloadPacket->data);

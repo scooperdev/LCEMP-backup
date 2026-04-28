@@ -2,21 +2,21 @@
 #include "UI.h"
 #include "UIScene_LoadOrJoinMenu.h"
 
-#include "..\..\..\Minecraft.World\StringHelpers.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.level.chunk.storage.h"
-#include "..\..\..\Minecraft.World\ConsoleSaveFile.h"
-#include "..\..\..\Minecraft.World\ConsoleSaveFileOriginal.h"
-#include "..\..\..\Minecraft.World\ConsoleSaveFileSplit.h"
-#include "..\..\ProgressRenderer.h"
-#include "..\..\MinecraftServer.h"
-#include "..\..\TexturePackRepository.h"
-#include "..\..\TexturePack.h"
-#include "..\Network\SessionInfo.h"
+#include "../../../Minecraft.World/StringHelpers.h"
+#include "../../../Minecraft.World/net.minecraft.world.item.h"
+#include "../../../Minecraft.World/net.minecraft.world.level.h"
+#include "../../../Minecraft.World/net.minecraft.world.level.chunk.storage.h"
+#include "../../../Minecraft.World/ConsoleSaveFile.h"
+#include "../../../Minecraft.World/ConsoleSaveFileOriginal.h"
+#include "../../../Minecraft.World/ConsoleSaveFileSplit.h"
+#include "../../ProgressRenderer.h"
+#include "../../MinecraftServer.h"
+#include "../../TexturePackRepository.h"
+#include "../../TexturePack.h"
+#include "../Network/SessionInfo.h"
 #if defined(__PS3__) || defined(__ORBIS__) || defined(__PSVITA__)
-#include "Common\Network\Sony\SonyHttp.h"
-#include "Common\Network\Sony\SonyRemoteStorage.h"
+#include "Common/Network/Sony/SonyHttp.h"
+#include "Common/Network/Sony/SonyRemoteStorage.h"
 #endif
 #if defined(__ORBIS__) || defined(__PSVITA__)
 #include <ces.h>
@@ -49,6 +49,104 @@ wstring UIScene_LoadOrJoinMenu::m_wstrStageText=L"";
 #ifdef _DEBUG_MENUS_ENABLED
 C4JStorage::SAVETRANSFER_FILE_DETAILS UIScene_LoadOrJoinMenu::m_debugTransferDetails;
 #endif
+#endif
+
+#ifdef _WINDOWS64
+static const int kAddServerNameMaxChars = 19;
+static const int kAddServerAddressMaxChars = 63;
+static const unsigned short kAddServerDefaultPort = 25565;
+
+static void TrimWideInPlace(wchar_t *text)
+{
+    if (text == NULL)
+        return;
+
+    wchar_t *start = text;
+    while (*start == L' ' || *start == L'\t' || *start == L'\r' || *start == L'\n')
+        ++start;
+
+    if (start != text)
+    {
+        memmove(text, start, (wcslen(start) + 1) * sizeof(wchar_t));
+    }
+
+    size_t len = wcslen(text);
+    while (len > 0)
+    {
+        wchar_t ch = text[len - 1];
+        if (ch == L' ' || ch == L'\t' || ch == L'\r' || ch == L'\n')
+            text[--len] = 0;
+        else
+            break;
+    }
+}
+
+static bool ParseServerAddress(const wchar_t *input, char *outHost, size_t outHostSize, unsigned short *outPort)
+{
+    if (input == NULL || outHost == NULL || outHostSize == 0 || outPort == NULL)
+        return false;
+
+    outHost[0] = 0;
+    *outPort = kAddServerDefaultPort;
+
+    wchar_t working[128];
+    wcsncpy_s(working, sizeof(working) / sizeof(working[0]), input, _TRUNCATE);
+    TrimWideInPlace(working);
+    if (working[0] == 0)
+        return false;
+
+    const wchar_t prefix[] = L"minecraft://";
+    if (_wcsnicmp(working, prefix, wcslen(prefix)) == 0)
+    {
+        wchar_t stripped[128];
+        wcsncpy_s(stripped, sizeof(stripped) / sizeof(stripped[0]), working + wcslen(prefix), _TRUNCATE);
+        wcsncpy_s(working, sizeof(working) / sizeof(working[0]), stripped, _TRUNCATE);
+        TrimWideInPlace(working);
+    }
+
+    wchar_t *slash = wcschr(working, L'/');
+    if (slash != NULL)
+        *slash = 0;
+
+    wchar_t *firstColon = wcschr(working, L':');
+    wchar_t *lastColon = wcsrchr(working, L':');
+    if (firstColon != NULL && firstColon != lastColon)
+        return false;
+
+    if (lastColon != NULL)
+    {
+        const wchar_t *portText = lastColon + 1;
+        if (*portText == 0)
+            return false;
+
+        for (const wchar_t *it = portText; *it != 0; ++it)
+        {
+            if (*it < L'0' || *it > L'9')
+                return false;
+        }
+
+        int parsedPort = _wtoi(portText);
+        if (parsedPort <= 0 || parsedPort > 65535)
+            return false;
+
+        *outPort = (unsigned short)parsedPort;
+        *lastColon = 0;
+        TrimWideInPlace(working);
+    }
+
+    if (working[0] == 0)
+        return false;
+
+    size_t converted = 0;
+    errno_t convRes = wcstombs_s(&converted, outHost, outHostSize, working, _TRUNCATE);
+    if (convRes != 0 || outHost[0] == 0)
+        return false;
+
+	if (strchr(outHost, ' ') != NULL || strchr(outHost, '\t') != NULL)
+		return false;
+
+    return true;
+}
 #endif
 
 int UIScene_LoadOrJoinMenu::LoadSaveDataThumbnailReturned(LPVOID lpParam,PBYTE pbThumbnail,DWORD dwThumbnailBytes)
@@ -124,6 +222,13 @@ UIScene_LoadOrJoinMenu::UIScene_LoadOrJoinMenu(int iPad, void *initData, UILayer
     m_bSavesDisplayed=false;
     m_saveDetails = NULL;
     m_iSaveDetailsCount = 0;
+#ifdef _WINDOWS64
+	m_pendingServerName[0] = 0;
+    m_bAddServerFlowActive = false;
+    m_bPendingAddServerAddressKeyboard = false;
+	m_bPendingAddServerAddressShowInvalid = false;
+    m_pendingServerAddressInput[0] = 0;
+#endif
     m_iTexturePacksNotInstalled = 0;
 	m_bCopying = false;
 	m_bCopyingCancelled = false;
@@ -310,9 +415,25 @@ void UIScene_LoadOrJoinMenu::updateTooltips()
     int iY = -1;
     int iLB = -1;
     int iX=-1;
+#ifdef _WINDOWS64
+	bool canDeleteSavedServer = false;
+#endif
     if (DoesGamesListHaveFocus() && m_buttonListGames.getItemCount() > 0)
     {
+#ifdef _WINDOWS64
+		int selectedIndex = m_buttonListGames.getCurrentSelection();
+		if (!IsAddServerListIndex(selectedIndex))
+		{
+			iY = IDS_TOOLTIPS_VIEW_GAMERCARD;
+            if (CanRemoveSavedServerAtListIndex(selectedIndex))
+            {
+                iRB = IDS_TOOLTIPS_DELETE;
+				canDeleteSavedServer = true;
+            }
+		}
+#else
         iY = IDS_TOOLTIPS_VIEW_GAMERCARD;
+#endif
     }
     else if (DoesSavesListHaveFocus())
     {
@@ -384,6 +505,13 @@ void UIScene_LoadOrJoinMenu::updateTooltips()
         iX = IDS_TOOLTIPS_CHANGEDEVICE;
 #endif
     }
+
+#ifdef _WINDOWS64
+    if (canDeleteSavedServer)
+    {
+        iX = IDS_TOOLTIPS_DELETE;
+    }
+#endif
 
     ui.SetTooltips( DEFAULT_XUI_MENU_USER, IDS_TOOLTIPS_SELECT, IDS_TOOLTIPS_BACK, iX, iY,-1,-1,iLB,iRB);
 }
@@ -543,6 +671,28 @@ void UIScene_LoadOrJoinMenu::tick()
 {
     UIScene::tick();
 
+#ifdef _WINDOWS64
+    if (m_bPendingAddServerAddressKeyboard && hasFocus(m_iPad) && !Win64InGameKeyboard::IsActive())
+    {
+        m_bPendingAddServerAddressKeyboard = false;
+        const wchar_t *addressTitle = m_bPendingAddServerAddressShowInvalid ? L"Invalid Address - use host[:port]" : L"Server Address (host[:port])";
+        m_bPendingAddServerAddressShowInvalid = false;
+        m_bIgnoreInput = true;
+        if (!Win64InGameKeyboard::Request(addressTitle,
+            m_pendingServerAddressInput,
+            (DWORD)m_iPad,
+            kAddServerAddressMaxChars,
+            &UIScene_LoadOrJoinMenu::AddServerAddressKeyboardCallback,
+            this,
+            C_4JInput::EKeyboardMode_Default))
+        {
+			m_bAddServerFlowActive = false;
+            m_bIgnoreInput = false;
+            updateTooltips();
+        }
+    }
+#endif
+
 #if (defined  __PS3__  || defined __ORBIS__ || defined _DURANGO || defined _WINDOWS64 || defined __PSVITA__)
     if(m_bExitScene) // navigate forward or back
     {
@@ -586,7 +736,7 @@ void UIScene_LoadOrJoinMenu::tick()
 
                 if(m_saveDetails!=NULL)
                 {
-                    for(unsigned int i = 0; i < m_iSaveDetailsCount; ++i)
+					for(int i = 0; i < m_iSaveDetailsCount; ++i)
                     {
                         if(m_saveDetails[i].pbThumbnailData!=NULL)
                         {
@@ -598,7 +748,7 @@ void UIScene_LoadOrJoinMenu::tick()
                 m_saveDetails = new SaveListDetails[m_pSaveDetails->iSaveC];
 
                 m_iSaveDetailsCount = m_pSaveDetails->iSaveC;
-                for(unsigned int i = 0; i < m_pSaveDetails->iSaveC; ++i)
+				for(int i = 0; i < m_pSaveDetails->iSaveC; ++i)
                 {
 #if defined(_XBOX_ONE)
                     m_spaceIndicatorSaves.addSave(m_pSaveDetails->SaveInfoA[i].totalSize);
@@ -941,7 +1091,25 @@ void UIScene_LoadOrJoinMenu::AddDefaultButtons()
 
 void UIScene_LoadOrJoinMenu::handleInput(int iPad, int key, bool repeat, bool pressed, bool released, bool &handled)
 {
+#ifdef _WINDOWS64
+    if (m_bIgnoreInput)
+    {
+        if (m_bAddServerFlowActive && (key == ACTION_MENU_CANCEL || key == ACTION_MENU_B) && pressed)
+        {
+            m_bAddServerFlowActive = false;
+            m_bPendingAddServerAddressKeyboard = false;
+            m_bPendingAddServerAddressShowInvalid = false;
+            m_pendingServerName[0] = 0;
+            m_pendingServerAddressInput[0] = 0;
+            m_bIgnoreInput = false;
+            updateTooltips();
+            handled = true;
+        }
+        return;
+    }
+#else
     if(m_bIgnoreInput) return;
+#endif
 
     // if we're retrieving save info, ignore key presses
     if(!m_bSavesDisplayed) return;
@@ -962,6 +1130,18 @@ void UIScene_LoadOrJoinMenu::handleInput(int iPad, int key, bool repeat, bool pr
         }
         break;
     case ACTION_MENU_X:
+#ifdef _WINDOWS64
+        if (DoesGamesListHaveFocus() && m_buttonListGames.getItemCount() > 0)
+        {
+            int selectedIndex = m_buttonListGames.getCurrentSelection();
+            if (RemoveSavedServerAtListIndex(selectedIndex))
+            {
+                ui.PlayUISFX(eSFX_Press);
+                handled = true;
+                break;
+            }
+        }
+#endif
 #if TO_BE_IMPLEMENTED
         // Change device
         // Fix for #12531 - TCR 001: BAS Game Stability: When a player selects to change a storage 
@@ -1041,6 +1221,18 @@ void UIScene_LoadOrJoinMenu::handleInput(int iPad, int key, bool repeat, bool pr
         break;
 
     case ACTION_MENU_RIGHT_SCROLL:
+#ifdef _WINDOWS64
+    if (DoesGamesListHaveFocus() && m_buttonListGames.getItemCount() > 0 && m_currentSessions != NULL)
+        {
+            int selectedIndex = m_buttonListGames.getCurrentSelection();
+            if (RemoveSavedServerAtListIndex(selectedIndex))
+            {
+                ui.PlayUISFX(eSFX_Press);
+                handled = true;
+                break;
+            }
+        }
+#endif
         if(DoesSavesListHaveFocus())
         {
             // 4J-PB - check we are on a valid save
@@ -1169,7 +1361,11 @@ int UIScene_LoadOrJoinMenu::KeyboardCompleteWorldNameCallback(LPVOID lpParam,boo
     {	
         uint16_t ui16Text[128];
         ZeroMemory(ui16Text, 128 * sizeof(uint16_t) );
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::GetText(ui16Text);
+	#else
         InputManager.GetText(ui16Text);
+	#endif
 
         // check the name is valid
         if(ui16Text[0]!=0)
@@ -1206,11 +1402,11 @@ void UIScene_LoadOrJoinMenu::handleFocusChange(F64 controlId, F64 childId)
 	switch((int)controlId)
 	{
 	case eControl_GamesList:	
-		m_iGameListIndex = childId;
+        m_iGameListIndex = (int)childId;
 		m_buttonListGames.updateChildFocus( (int) childId );
 		break;
 	case eControl_SavesList:
-		m_iSaveListIndex = childId;
+        m_iSaveListIndex = (int)childId;
         m_bUpdateSaveSize = true;
 		break;
 	};
@@ -1334,8 +1530,6 @@ void UIScene_LoadOrJoinMenu::handlePress(F64 controlId, F64 childId)
         break;
     case eControl_GamesList:
         {
-            m_bIgnoreInput=true;
-			
 			m_eAction = eAction_JoinGame;
 
             //CD - Added for audio
@@ -1344,7 +1538,28 @@ void UIScene_LoadOrJoinMenu::handlePress(F64 controlId, F64 childId)
 			{
 				int nIndex = (int)childId;
 				m_iGameListIndex = nIndex;
-				CheckAndJoinGame(nIndex);
+#ifdef _WINDOWS64
+                if (IsAddServerListIndex(nIndex))
+                {
+                    BeginAddServerFlow();
+                }
+                else
+                {
+                    if (m_currentSessions == NULL || nIndex < 0 || nIndex >= (int)m_currentSessions->size())
+                    {
+                        m_bIgnoreInput = false;
+                        updateTooltips();
+                    }
+                    else
+                    {
+                        m_bIgnoreInput = true;
+                        CheckAndJoinGame(nIndex);
+                    }
+                }
+#else
+                m_bIgnoreInput=true;
+                CheckAndJoinGame(nIndex);
+#endif
 			}
 
             break;
@@ -1352,9 +1567,233 @@ void UIScene_LoadOrJoinMenu::handlePress(F64 controlId, F64 childId)
     }
 }
 
+#ifdef _WINDOWS64
+bool UIScene_LoadOrJoinMenu::IsAddServerListIndex(int listIndex)
+{
+    if (listIndex < 0)
+        return false;
+
+    int itemCount = m_buttonListGames.getItemCount();
+    if (itemCount <= 0)
+        return false;
+
+    return (listIndex == (itemCount - 1));
+}
+
+bool UIScene_LoadOrJoinMenu::TryGetSavedServerAtListIndex(int listIndex, char *pHost, int hostSize, unsigned short *pPort)
+{
+    if (m_currentSessions == NULL)
+        return false;
+
+    if (listIndex < 0 || listIndex >= (int)m_currentSessions->size())
+        return false;
+
+    if (IsAddServerListIndex(listIndex))
+        return false;
+
+    FriendSessionInfo *selectedSession = m_currentSessions->at(listIndex);
+    if (selectedSession == NULL)
+        return false;
+
+    if (selectedSession->data.hostIP[0] == 0)
+        return false;
+
+    if (selectedSession->data.hostPort <= 0 || selectedSession->data.hostPort > 65535)
+        return false;
+
+    for (int i = 0; i < app.GetSavedServerCount(m_iPad); ++i)
+    {
+        char savedName[WIN64_SAVED_SERVER_NAME_CHARS];
+        char savedHost[WIN64_SAVED_SERVER_HOST_CHARS];
+        unsigned short savedPort = 0;
+        if (!app.GetSavedServer(m_iPad, i, savedName, sizeof(savedName), savedHost, sizeof(savedHost), &savedPort))
+            continue;
+
+        if (_stricmp(savedHost, selectedSession->data.hostIP) == 0 && savedPort == (unsigned short)selectedSession->data.hostPort)
+        {
+            if (pHost != NULL && hostSize > 0)
+            {
+                strncpy_s(pHost, hostSize, savedHost, _TRUNCATE);
+            }
+
+            if (pPort != NULL)
+            {
+                *pPort = savedPort;
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool UIScene_LoadOrJoinMenu::CanRemoveSavedServerAtListIndex(int listIndex)
+{
+    return TryGetSavedServerAtListIndex(listIndex, NULL, 0, NULL);
+}
+
+bool UIScene_LoadOrJoinMenu::RemoveSavedServerAtListIndex(int listIndex)
+{
+    char host[WIN64_SAVED_SERVER_HOST_CHARS];
+    unsigned short port = 0;
+    if (!TryGetSavedServerAtListIndex(listIndex, host, sizeof(host), &port))
+        return false;
+
+    if (!app.RemoveSavedServer(m_iPad, host, port))
+        return false;
+
+    app.CheckGameSettingsChanged(true, m_iPad);
+    g_NetworkManager.ForceFriendsSessionRefresh();
+    UpdateGamesList();
+
+    int itemCount = m_buttonListGames.getItemCount();
+    if (itemCount > 0)
+    {
+        if (listIndex >= itemCount)
+            listIndex = itemCount - 1;
+
+        if (listIndex < 0)
+            listIndex = 0;
+
+        m_buttonListGames.setCurrentSelection(listIndex);
+    }
+
+    updateTooltips();
+    return true;
+}
+
+void UIScene_LoadOrJoinMenu::BeginAddServerFlow()
+{
+    m_pendingServerName[0] = 0;
+	m_bAddServerFlowActive = true;
+	m_bPendingAddServerAddressKeyboard = false;
+    m_bPendingAddServerAddressShowInvalid = false;
+	m_pendingServerAddressInput[0] = 0;
+    m_bIgnoreInput = true;
+
+    if (!Win64InGameKeyboard::Request(L"Add Server Name",
+        L"",
+        (DWORD)m_iPad,
+        kAddServerNameMaxChars,
+        &UIScene_LoadOrJoinMenu::AddServerNameKeyboardCallback,
+        this,
+        C_4JInput::EKeyboardMode_Default))
+    {
+		m_bAddServerFlowActive = false;
+        m_bIgnoreInput = false;
+        updateTooltips();
+    }
+}
+
+void UIScene_LoadOrJoinMenu::QueueAddServerAddressKeyboard(const wchar_t *initialText, bool showInvalidMessage)
+{
+	if (initialText != NULL)
+		wcsncpy_s(m_pendingServerAddressInput, 128, initialText, _TRUNCATE);
+	else
+		m_pendingServerAddressInput[0] = 0;
+
+    m_bPendingAddServerAddressShowInvalid = showInvalidMessage;
+	m_bPendingAddServerAddressKeyboard = true;
+}
+
+int UIScene_LoadOrJoinMenu::AddServerNameKeyboardCallback(LPVOID lpParam, bool bRes)
+{
+    UIScene_LoadOrJoinMenu *pClass = (UIScene_LoadOrJoinMenu *)lpParam;
+    if (pClass == NULL)
+        return 0;
+
+    if (!bRes)
+    {
+		pClass->m_bAddServerFlowActive = false;
+		pClass->m_bPendingAddServerAddressKeyboard = false;
+		pClass->m_bPendingAddServerAddressShowInvalid = false;
+        pClass->m_bIgnoreInput = false;
+        pClass->updateTooltips();
+        return 0;
+    }
+
+    uint16_t ui16Text[128];
+    ZeroMemory(ui16Text, sizeof(ui16Text));
+    Win64InGameKeyboard::GetText(ui16Text);
+    TrimWideInPlace((wchar_t *)ui16Text);
+
+    if (((wchar_t *)ui16Text)[0] == 0)
+    {
+        wcsncpy_s((wchar_t *)ui16Text, 128, L"Saved Server", _TRUNCATE);
+    }
+
+    wcsncpy_s(pClass->m_pendingServerName, 64, (wchar_t *)ui16Text, _TRUNCATE);
+
+    pClass->m_bIgnoreInput = true;
+	pClass->QueueAddServerAddressKeyboard(L"");
+
+    return 0;
+}
+
+int UIScene_LoadOrJoinMenu::AddServerAddressKeyboardCallback(LPVOID lpParam, bool bRes)
+{
+    UIScene_LoadOrJoinMenu *pClass = (UIScene_LoadOrJoinMenu *)lpParam;
+    if (pClass == NULL)
+        return 0;
+
+    if (!bRes)
+    {
+		pClass->m_bAddServerFlowActive = false;
+		pClass->m_bPendingAddServerAddressKeyboard = false;
+		pClass->m_bPendingAddServerAddressShowInvalid = false;
+        pClass->m_bIgnoreInput = false;
+        pClass->updateTooltips();
+        return 0;
+    }
+
+    uint16_t ui16Text[128];
+    ZeroMemory(ui16Text, sizeof(ui16Text));
+    Win64InGameKeyboard::GetText(ui16Text);
+    TrimWideInPlace((wchar_t *)ui16Text);
+
+    char host[WIN64_SAVED_SERVER_HOST_CHARS];
+    unsigned short port = kAddServerDefaultPort;
+    if (!ParseServerAddress((wchar_t *)ui16Text, host, sizeof(host), &port))
+    {
+        pClass->m_bIgnoreInput = true;
+		pClass->QueueAddServerAddressKeyboard((wchar_t *)ui16Text, true);
+        return 0;
+    }
+
+    char name[WIN64_SAVED_SERVER_NAME_CHARS];
+    name[0] = 0;
+    size_t converted = 0;
+    wcstombs_s(&converted, name, sizeof(name), pClass->m_pendingServerName, _TRUNCATE);
+
+    if (!app.AddOrUpdateSavedServer(pClass->m_iPad, name, host, port))
+    {
+        pClass->m_bIgnoreInput = true;
+        pClass->QueueAddServerAddressKeyboard((wchar_t *)ui16Text, true);
+        return 0;
+    }
+
+    app.CheckGameSettingsChanged(true, pClass->m_iPad);
+    g_NetworkManager.ForceFriendsSessionRefresh();
+
+    if (pClass->m_buttonListGames.getItemCount() > 0)
+    {
+        pClass->m_buttonListGames.setCurrentSelection(0);
+    }
+
+	pClass->m_bPendingAddServerAddressKeyboard = false;
+	pClass->m_bPendingAddServerAddressShowInvalid = false;
+	pClass->m_bAddServerFlowActive = false;
+    pClass->m_bIgnoreInput = false;
+    pClass->UpdateGamesList();
+    pClass->updateTooltips();
+    return 0;
+}
+#endif
+
 void UIScene_LoadOrJoinMenu::CheckAndJoinGame(int gameIndex)
 {
-	if( m_buttonListGames.getItemCount() > 0 && gameIndex < m_currentSessions->size() )
+    if( m_currentSessions != NULL && m_buttonListGames.getItemCount() > 0 && gameIndex >= 0 && gameIndex < (int)m_currentSessions->size() )
 	{
 #if defined(__PS3__) || defined(__ORBIS__) || defined(__PSVITA__)
 		// 4J-PB - is the player allowed to join games?
@@ -1610,10 +2049,24 @@ void UIScene_LoadOrJoinMenu::UpdateGamesList()
 
 
     FriendSessionInfo *pSelectedSession = NULL;
+    #ifdef _WINDOWS64
+    bool addServerSelected = false;
+    #endif
     if(DoesGamesListHaveFocus() && m_buttonListGames.getItemCount() > 0)
     {
         unsigned int nIndex = m_buttonListGames.getCurrentSelection();
+#ifdef _WINDOWS64
+        if (IsAddServerListIndex((int)nIndex))
+        {
+            addServerSelected = true;
+        }
+        else if (m_currentSessions != NULL && nIndex < m_currentSessions->size())
+        {
+            pSelectedSession = m_currentSessions->at(nIndex);
+        }
+#else
         pSelectedSession = m_currentSessions->at( nIndex );
+#endif
     }
 
     SessionID selectedSessionId;
@@ -1665,6 +2118,9 @@ void UIScene_LoadOrJoinMenu::UpdateGamesList()
 
     // clear out the games list and re-fill
     m_buttonListGames.clearList();
+    #ifdef _WINDOWS64
+	bool selectedSessionRestored = false;
+    #endif
 
     if( filteredListSize > 0 )
     {
@@ -1734,11 +2190,26 @@ void UIScene_LoadOrJoinMenu::UpdateGamesList()
             if(memcmp( &selectedSessionId, &sessionInfo->sessionId, sizeof(SessionID) ) == 0)
             {
                 m_buttonListGames.setCurrentSelection(sessionIndex);
+                #ifdef _WINDOWS64
+                selectedSessionRestored = true;
+                #endif
                 break;
             }
             ++sessionIndex;
         }
     }
+
+#ifdef _WINDOWS64
+    m_buttonListGames.addItem(L"Add Server...", L"");
+    if (addServerSelected || (filteredListSize == 0 && m_buttonListGames.getItemCount() > 0))
+    {
+        m_buttonListGames.setCurrentSelection(m_buttonListGames.getItemCount() - 1);
+    }
+    else if (!selectedSessionRestored && filteredListSize > 0)
+    {
+        m_buttonListGames.setCurrentSelection(0);
+    }
+#endif
 
 	updateTooltips();
 }
@@ -1893,7 +2364,12 @@ void UIScene_LoadOrJoinMenu::LoadSaveFromDisk(File *saveFile, ESavePlatform save
 
     __int64 fileSize = saveFile->length();
     FileInputStream fis(*saveFile);
-    byteArray ba(fileSize);
+    if (fileSize < 0 || fileSize > 0xFFFFFFFF)
+    {
+        app.DebugPrintf("LoadSaveFromDisk failed: invalid file size %I64d\n", fileSize);
+        return;
+    }
+    byteArray ba((unsigned int)fileSize);
     fis.read(ba);
     fis.close();
 
@@ -2101,6 +2577,11 @@ int UIScene_LoadOrJoinMenu::SaveOptionsDialogReturned(void *pParam,int iPad,C4JS
 #ifdef _DURANGO
             // bring up a keyboard
             InputManager.RequestKeyboard(app.GetString(IDS_RENAME_WORLD_TITLE), (pClass->m_saveDetails[pClass->m_iSaveListIndex-pClass->m_iDefaultButtonsC]).UTF16SaveName,(DWORD)0,25,&UIScene_LoadOrJoinMenu::KeyboardCompleteWorldNameCallback,pClass,C_4JInput::EKeyboardMode_Default);
+#elif defined(_WINDOWS64)
+			wchar_t wSaveName[128];
+			ZeroMemory(wSaveName, 128 * sizeof(wchar_t) );
+			mbstowcs(wSaveName, pClass->m_saveDetails[pClass->m_iSaveListIndex - pClass->m_iDefaultButtonsC].UTF8SaveName, strlen(pClass->m_saveDetails->UTF8SaveName)+1);
+			Win64InGameKeyboard::Request(app.GetString(IDS_RENAME_WORLD_TITLE), wSaveName, (DWORD)0, 25, &UIScene_LoadOrJoinMenu::KeyboardCompleteWorldNameCallback, pClass, C_4JInput::EKeyboardMode_Default);
 #else
             // bring up a keyboard
             wchar_t wSaveName[128];

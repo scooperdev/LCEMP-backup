@@ -143,9 +143,6 @@ void Inventory::grabTexture(int id, int data, bool checkData, bool mayReplace)
 
 void Inventory::swapPaint(int wheel)
 {
-	if (wheel > 0) wheel = 1;
-	if (wheel < 0) wheel = -1;
-
 	selected -= wheel;
 
 	while (selected < 0)

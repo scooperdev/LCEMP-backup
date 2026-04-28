@@ -2,30 +2,31 @@
 #include <xuiresource.h>
 #include <xuiapp.h>
 #include <assert.h>
-#include "..\..\..\Minecraft.World\StringHelpers.h"
-#include "..\..\Common\Tutorial\TutorialMode.h"
-#include "..\..\..\Minecraft.World\ConsoleSaveFileIO.h"
-#include "..\..\LocalPlayer.h"
-#include "..\..\Minecraft.h"
-#include "..\..\ProgressRenderer.h"
-#include "..\..\..\Minecraft.World\AABB.h"
-#include "..\..\..\Minecraft.World\Vec3.h"
-#include "..\..\..\Minecraft.World\ArrayWithLength.h"
-#include "..\..\..\Minecraft.World\File.h"
-#include "..\..\..\Minecraft.World\InputOutputStream.h"
+#include "../../../Minecraft.World/StringHelpers.h"
+#include "../../Common/Tutorial/TutorialMode.h"
+#include "../../../Minecraft.World/ConsoleSaveFileIO.h"
+#include "../../LocalPlayer.h"
+#include "../../Minecraft.h"
+#include "../../ProgressRenderer.h"
+#include "../../../Minecraft.World/AABB.h"
+#include "../../../Minecraft.World/Vec3.h"
+#include "../../../Minecraft.World/ArrayWithLength.h"
+#include "../../../Minecraft.World/File.h"
+#include "../../../Minecraft.World/InputOutputStream.h"
 #include "XUI_Ctrl_4JList.h"
 #include "XUI_Ctrl_4JIcon.h"
 #include "XUI_LoadSettings.h"
 #include "XUI_MultiGameInfo.h"
 #include "XUI_MultiGameJoinLoad.h"
 #include "XUI_MultiGameCreate.h"
-#include "..\..\MinecraftServer.h"
-#include "..\..\Options.h"
+#include "../../MinecraftServer.h"
+#include "../../Options.h"
+#include "../UI/UIScene_Keyboard.h"
 
-#include "..\GameRules\LevelGenerationOptions.h"
-#include "..\..\TexturePackRepository.h"
-#include "..\..\TexturePack.h"
-#include "..\..\..\Minecraft.World\LevelSettings.h"
+#include "../GameRules/LevelGenerationOptions.h"
+#include "../../TexturePackRepository.h"
+#include "../../TexturePack.h"
+#include "../../../Minecraft.World/LevelSettings.h"
 
 #define CHECKFORAVAILABLETEXTUREPACKS_TIMER_ID 3
 #define CHECKFORAVAILABLETEXTUREPACKS_TIMER_TIME 100
@@ -2241,7 +2242,11 @@ int CScene_MultiGameJoinLoad::SaveOptionsDialogReturned(void *pParam,int iPad,C4
 		{
 			ZeroMemory(pClass->m_wchNewName,sizeof(WCHAR)*XCONTENT_MAX_DISPLAYNAME_LENGTH);
 			// bring up a keyboard
+		#ifdef _WINDOWS64
+			Win64InGameKeyboard::Request(app.GetString(IDS_RENAME_WORLD_TITLE), L"", (unsigned int)iPad, XCONTENT_MAX_DISPLAYNAME_LENGTH - 1, &CScene_MultiGameJoinLoad::KeyboardReturned, pClass, C_4JInput::EKeyboardMode_Default, pClass->m_wchNewName, XCONTENT_MAX_DISPLAYNAME_LENGTH);
+		#else
 			InputManager.RequestKeyboard(IDS_RENAME_WORLD_TITLE,L"",IDS_RENAME_WORLD_TEXT,iPad,pClass->m_wchNewName,XCONTENT_MAX_DISPLAYNAME_LENGTH,&CScene_MultiGameJoinLoad::KeyboardReturned,pClass,C_4JInput::EKeyboardMode_Default,app.GetStringTable());
+		#endif
 		}
 		else // delete
 		{

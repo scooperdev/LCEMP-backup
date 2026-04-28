@@ -10,7 +10,7 @@
 #include "RandomLevelSource.h"
 
 #ifdef __PS3__
-#include "..\Minecraft.Client\PS3\SPU_Tasks\PerlinNoise\PerlinNoiseJob.h"
+#include "../Minecraft.Client/PS3/SPU_Tasks/PerlinNoise/PerlinNoiseJob.h"
 #include "C4JSpursJob.h"
 static PerlinNoise_DataIn g_lperlinNoise1_SPU __attribute__((__aligned__(16)));
 static PerlinNoise_DataIn g_lperlinNoise2_SPU __attribute__((__aligned__(16)));
@@ -664,7 +664,7 @@ void RandomLevelSource::postProcess(ChunkSource *parent, int xt, int zt)
 		mineShaftFeature->postProcess(level, pprandom, xt, zt);
 		hasVillage = villageFeature->postProcess(level, pprandom, xt, zt);
 		strongholdFeature->postProcess(level, pprandom, xt, zt);
-		scatteredFeature->postProcess(level, random, xt, zt);
+		scatteredFeature->postProcess(level, pprandom, xt, zt);
 	}
 	PIXEndNamedEvent();
 
@@ -674,7 +674,7 @@ void RandomLevelSource::postProcess(ChunkSource *parent, int xt, int zt)
 		int x = xo + pprandom->nextInt(16) + 8;
 		int y = pprandom->nextInt(Level::genDepth);
 		int z = zo + pprandom->nextInt(16) + 8;
-
+ 
 		LakeFeature *calmWater = new LakeFeature(Tile::calmWater_Id);
 		calmWater->place(level, pprandom, x, y, z);
 		delete calmWater;

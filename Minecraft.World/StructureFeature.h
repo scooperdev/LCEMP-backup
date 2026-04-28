@@ -17,8 +17,10 @@ public:
 
 protected:
 	unordered_map<__int64, StructureStart *> cachedStructures;
+	CRITICAL_SECTION m_csCachedStructures;
 
 public:
+	StructureFeature();
 	~StructureFeature();
 
 	virtual void addFeature(Level *level, int x, int z, int xOffs, int zOffs, byteArray blocks);

@@ -39,30 +39,30 @@
 #include "Lighting.h"
 #include "Options.h"
 #include "MultiPlayerChunkCache.h"
-#include "..\Minecraft.World\ParticleTypes.h"
-#include "..\Minecraft.World\IntCache.h"
-#include "..\Minecraft.World\IntBuffer.h"
-#include "..\Minecraft.World\JavaMath.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\Minecraft.World\net.minecraft.world.phys.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.player.h"
-#include "..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\Minecraft.World\System.h"
-#include "..\Minecraft.World\StringHelpers.h"
-#include "..\Minecraft.World\net.minecraft.world.level.chunk.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.projectile.h"
-#include "..\Minecraft.World\net.minecraft.world.h"
-#include "MultiplayerLocalPlayer.h"
+#include "../Minecraft.World/ParticleTypes.h"
+#include "../Minecraft.World/IntCache.h"
+#include "../Minecraft.World/IntBuffer.h"
+#include "../Minecraft.World/JavaMath.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../Minecraft.World/net.minecraft.world.phys.h"
+#include "../Minecraft.World/net.minecraft.world.entity.player.h"
+#include "../Minecraft.World/net.minecraft.world.item.h"
+#include "../Minecraft.World/System.h"
+#include "../Minecraft.World/StringHelpers.h"
+#include "../Minecraft.World/net.minecraft.world.level.chunk.h"
+#include "../Minecraft.World/net.minecraft.world.entity.projectile.h"
+#include "../Minecraft.World/net.minecraft.world.h"
+#include "MultiPlayerLocalPlayer.h"
 #include "MultiPlayerLevel.h"
-#include "..\Minecraft.World\SoundTypes.h"
+#include "../Minecraft.World/SoundTypes.h"
 #include "FrustumCuller.h"
-#include "..\Minecraft.World\BasicTypeContainers.h"
+#include "../Minecraft.World/BasicTypeContainers.h"
 
 #ifdef __PS3__
-#include "PS3\SPU_Tasks\LevelRenderer_cull\LevelRenderer_cull.h"
-#include "PS3\SPU_Tasks\LevelRenderer_FindNearestChunk\LevelRenderer_FindNearestChunk.h"
+#include "PS3/SPU_Tasks/LevelRenderer_cull/LevelRenderer_cull.h"
+#include "PS3/SPU_Tasks/LevelRenderer_FindNearestChunk/LevelRenderer_FindNearestChunk.h"
 #include "C4JSpursJob.h"
 
 static LevelRenderer_cull_DataIn g_cullDataIn[4] __attribute__((__aligned__(16)));
@@ -76,6 +76,7 @@ Chunk LevelRenderer::permaChunk[MAX_CONCURRENT_CHUNK_REBUILDS];
 C4JThread *LevelRenderer::rebuildThreads[MAX_CHUNK_REBUILD_THREADS];
 C4JThread::EventArray *LevelRenderer::s_rebuildCompleteEvents;
 C4JThread::Event *LevelRenderer::s_activationEventA[MAX_CHUNK_REBUILD_THREADS];
+volatile bool LevelRenderer::s_rebuildThreadsTerminate = false;
 
 // This defines the maximum size of renderable level, must be big enough to cope with actual size of level + view distance at each side
 // so that we can render the "infinite" sea at the edges. Currently defined as:
@@ -3589,6 +3590,12 @@ void LevelRenderer::DestroyedTileManager::tick()
 #ifdef _LARGE_WORLDS
 void LevelRenderer::staticCtor()
 {
+	if (s_rebuildCompleteEvents != NULL)
+	{
+		return;
+	}
+
+	s_rebuildThreadsTerminate = false;
 	s_rebuildCompleteEvents = new C4JThread::EventArray(MAX_CHUNK_REBUILD_THREADS);
 	char threadName[256];
 	for(unsigned int i = 0; i < MAX_CHUNK_REBUILD_THREADS; ++i)
@@ -3614,6 +3621,46 @@ void LevelRenderer::staticCtor()
 	}
 }
 
+void LevelRenderer::shutdownRebuildThreads()
+{
+	if (s_rebuildCompleteEvents == NULL)
+	{
+		return;
+	}
+
+	s_rebuildThreadsTerminate = true;
+
+	for (unsigned int i = 0; i < MAX_CHUNK_REBUILD_THREADS; ++i)
+	{
+		if (s_activationEventA[i] != NULL)
+		{
+			s_activationEventA[i]->Set();
+		}
+	}
+
+	for (unsigned int i = 0; i < MAX_CHUNK_REBUILD_THREADS; ++i)
+	{
+		if (rebuildThreads[i] != NULL)
+		{
+			rebuildThreads[i]->WaitForCompletion(INFINITE);
+			delete rebuildThreads[i];
+			rebuildThreads[i] = NULL;
+		}
+	}
+
+	for (unsigned int i = 0; i < MAX_CHUNK_REBUILD_THREADS; ++i)
+	{
+		if (s_activationEventA[i] != NULL)
+		{
+			delete s_activationEventA[i];
+			s_activationEventA[i] = NULL;
+		}
+	}
+
+	delete s_rebuildCompleteEvents;
+	s_rebuildCompleteEvents = NULL;
+}
+
 int LevelRenderer::rebuildChunkThreadProc(LPVOID lpParam)
 {
 	Vec3::CreateNewThreadStorage();
@@ -3629,6 +3676,11 @@ int LevelRenderer::rebuildChunkThreadProc(LPVOID lpParam)
 	while(true)
 	{
 		s_activationEventA[index]->WaitForSignal(INFINITE);
+
+		if (s_rebuildThreadsTerminate)
+		{
+			break;
+		}
 
 		//app.DebugPrintf("Rebuilding permaChunk %d\n", index + 1);
 		permaChunk[index + 1].rebuild();

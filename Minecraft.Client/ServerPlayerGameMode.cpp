@@ -3,13 +3,13 @@
 #include "ServerLevel.h"
 #include "ServerPlayer.h"
 #include "PlayerConnection.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.player.h"
-#include "..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\Minecraft.World\net.minecraft.network.packet.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.world.level.chunk.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../Minecraft.World/net.minecraft.world.entity.player.h"
+#include "../Minecraft.World/net.minecraft.world.item.h"
+#include "../Minecraft.World/net.minecraft.network.packet.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.world.level.chunk.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
 #include "MultiPlayerLevel.h"
 #include "LevelRenderer.h"
 
@@ -153,7 +153,11 @@ void ServerPlayerGameMode::startDestroyBlock(int x, int y, int z, int face)
 		progress = Tile::tiles[t]->getDestroyProgress(player, player->level, x, y, z);
 	}
 
-    if (t > 0 && (progress >= 1 || (app.DebugSettingsOn() && (player->GetDebugOptions()&(1L<<eDebugSetting_InstantDestroy) ) )))
+    if (t > 0 && (progress >= 1
+#ifndef _DEDICATED_SERVER
+		|| (app.DebugSettingsOn() && (player->GetDebugOptions()&(1L<<eDebugSetting_InstantDestroy) ) )
+#endif
+		))
 	{
         destroyBlock(x, y, z);
     }
@@ -180,10 +184,11 @@ void ServerPlayerGameMode::stopDestroyBlock(int x, int y, int z)
 		{
             Tile *tile = Tile::tiles[t];
 
-			// MGH -	removed checking for the destroy progress here, it has already been checked on the client before it sent the packet.
-			//			fixes issues with this failing to destroy because of packets bunching up
-//             float destroyProgress = tile->getDestroyProgress(player, player->level, x, y, z) * (ticksSpentDestroying + 1);
-//             if (destroyProgress >= .7f || bIgnoreDestroyProgress)
+#ifdef _DEDICATED_SERVER
+			int ticksSpentDestroying = gameTicks - destroyProgressStart;
+			float destroyProgress = tile->getDestroyProgress(player, player->level, x, y, z) * (ticksSpentDestroying + 1);
+			if (destroyProgress >= 0.7f)
+#endif
 			{
 				isDestroyingBlock = false;
 				level->destroyTileProgress(player->entityId, x, y, z, -1);

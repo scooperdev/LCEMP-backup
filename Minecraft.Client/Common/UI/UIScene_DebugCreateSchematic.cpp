@@ -1,11 +1,11 @@
 #include "stdafx.h"
 
-#ifdef _DEBUG_MENUS_ENABLED
+#if defined(_DEBUG_MENUS_ENABLED) && !defined(_CONTENT_PACKAGE)
 #include "UI.h"
 #include "UIScene_DebugCreateSchematic.h"
 #include "Minecraft.h"
-#include "..\..\..\Minecraft.World\StringHelpers.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.level.h"
+#include "../../../Minecraft.World/StringHelpers.h"
+#include "../../../Minecraft.World/net.minecraft.world.level.h"
 
 UIScene_DebugCreateSchematic::UIScene_DebugCreateSchematic(int iPad, void *initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
 {
@@ -113,7 +113,11 @@ void UIScene_DebugCreateSchematic::handlePress(F64 controlId, F64 childId)
 	case eControl_EndY:
 	case eControl_EndZ:
 		m_keyboardCallbackControl = (eControls)((int)controlId);	
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::Request(L"Enter something", L"", (DWORD)0, 25, &UIScene_DebugCreateSchematic::KeyboardCompleteCallback, this, C_4JInput::EKeyboardMode_Default);
+	#else
 		InputManager.RequestKeyboard(L"Enter something",L"",(DWORD)0,25,&UIScene_DebugCreateSchematic::KeyboardCompleteCallback,this,C_4JInput::EKeyboardMode_Default);
+	#endif
 		break;
 	};
 }
@@ -140,7 +144,11 @@ int UIScene_DebugCreateSchematic::KeyboardCompleteCallback(LPVOID lpParam,bool b
 
 	uint16_t pchText[128];
 	ZeroMemory(pchText, 128 * sizeof(uint16_t) );
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::GetText(pchText);
+	#else
 	InputManager.GetText(pchText);
+	#endif
 
 	if(pchText[0]!=0)
 	{

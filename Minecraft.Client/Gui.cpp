@@ -3,30 +3,30 @@
 #include "ItemRenderer.h"
 #include "GameRenderer.h"
 #include "Options.h"
-#include "MultiplayerLocalPlayer.h"
+#include "MultiPlayerLocalPlayer.h"
 #include "Textures.h"
 #include "GameMode.h"
 #include "Lighting.h"
 #include "ChatScreen.h"
 #include "MultiPlayerLevel.h"
-#include "..\Minecraft.World\JavaMath.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.player.h"
-#include "..\Minecraft.World\net.minecraft.world.effect.h"
-#include "..\Minecraft.World\net.minecraft.world.food.h"
-#include "..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\LevelData.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\Minecraft.World\System.h"
-#include "..\Minecraft.World\Language.h"
+#include "../Minecraft.World/JavaMath.h"
+#include "../Minecraft.World/net.minecraft.world.entity.player.h"
+#include "../Minecraft.World/net.minecraft.world.effect.h"
+#include "../Minecraft.World/net.minecraft.world.food.h"
+#include "../Minecraft.World/net.minecraft.world.item.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/LevelData.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../Minecraft.World/System.h"
+#include "../Minecraft.World/Language.h"
 #include "EntityRenderDispatcher.h"
-#include "..\Minecraft.World\Dimension.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.boss.enderdragon.h"
+#include "../Minecraft.World/Dimension.h"
+#include "../Minecraft.World/net.minecraft.world.entity.boss.enderdragon.h"
 #include "EnderDragonRenderer.h"
-#include "..\Minecraft.World\net.minecraft.h"
-#include "..\Minecraft.World\net.minecraft.world.h"
-#include "..\Minecraft.World\LevelChunk.h"
-#include "..\Minecraft.World\Biome.h"
+#include "../Minecraft.World/net.minecraft.h"
+#include "../Minecraft.World/net.minecraft.world.h"
+#include "../Minecraft.World/LevelChunk.h"
+#include "../Minecraft.World/Biome.h"
 
 #define RENDER_HUD 0
 //#ifndef _XBOX
@@ -62,6 +62,14 @@ void Gui::render(float a, bool mouseFree, int xMouse, int yMouse)
 	int splitYOffset;// = 20;	// This offset is applied when doing the 2X scaling above to move the gui out of the way of the tool tips
 	int guiScale;// = ( minecraft->player->m_iScreenSection == C4JRender::VIEWPORT_TYPE_FULLSCREEN ? 3 : 2 );
 	int iPad=minecraft->player->GetXboxPad();
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+	{
+		iPad = ProfileManager.GetPrimaryPad();
+		if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		{
+			iPad = 0;
+		}
+	}
 	int iWidthOffset=0,iHeightOffset=0; // used to get the interface looking right on a 2 player split screen game
 
  	// 4J-PB - selected the gui scale based on the slider settings

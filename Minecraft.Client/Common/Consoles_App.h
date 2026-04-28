@@ -5,23 +5,23 @@ using namespace std;
 #include "Audio/Consoles_SoundEngine.h"
 
 #include <xuiapp.h>
-#include "..\Common\Tutorial\TutorialEnum.h"
+#include "../Common/Tutorial/TutorialEnum.h"
 
 #ifdef _XBOX
-#include "..\Common\XUI\XUI_Helper.h"
-#include "..\Common\XUI\XUI_HelpCredits.h"
+#include "../Common/XUI/XUI_Helper.h"
+#include "../Common/XUI/XUI_HelpCredits.h"
 #endif
-#include "UI\UIStructs.h"
+#include "UI/UIStructs.h"
 
-#include "..\..\Minecraft.World\DisconnectPacket.h"
+#include "../../Minecraft.World/DisconnectPacket.h"
 #include <xsocialpost.h>
 
-#include "..\StringTable.h"
-#include "..\Common\DLC\DLCManager.h"
-#include "..\Common\GameRules\ConsoleGameRulesConstants.h"
-#include "..\Common\GameRules\GameRuleManager.h"
-#include "..\SkinBox.h"
-#include "..\ArchiveFile.h"
+#include "../StringTable.h"
+#include "../Common/DLC/DLCManager.h"
+#include "../Common/GameRules/ConsoleGameRulesConstants.h"
+#include "../Common/GameRules/GameRuleManager.h"
+#include "../SkinBox.h"
+#include "../ArchiveFile.h"
 
 typedef struct _JoinFromInviteData
 {
@@ -247,6 +247,10 @@ public:
 	// Minecraft language select
 	void			SetMinecraftLanguage(int iPad, unsigned char ucLanguage);
 	unsigned char	GetMinecraftLanguage(int iPad);
+	int				GetSavedServerCount(int iPad);
+	bool			GetSavedServer(int iPad, int index, char *pName, int nameSize, char *pHost, int hostSize, unsigned short *pPort);
+	bool			AddOrUpdateSavedServer(int iPad, const char *pszName, const char *pszHost, unsigned short usPort);
+	bool			RemoveSavedServer(int iPad, const char *pszHost, unsigned short usPort);
 
 
 	// 4J-PB - set a timer when the user navigates the quickselect, so we can bring the opacity back to defaults for a short time

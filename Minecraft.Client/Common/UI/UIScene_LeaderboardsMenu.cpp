@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "UI.h"
 #include "UIScene_LeaderboardsMenu.h"
-#include "..\Leaderboards\LeaderboardManager.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.item.h"
+#include "../Leaderboards/LeaderboardManager.h"
+#include "../../../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../../../Minecraft.World/net.minecraft.world.item.h"
 
 #define PLAYER_ONLINE_TIMER_ID 0
 #define PLAYER_ONLINE_TIMER_TIME 100
@@ -882,11 +882,9 @@ void UIScene_LeaderboardsMenu::PopulateLeaderboard(LeaderboardManager::eStatsRet
 					m_leaderboard.m_entries[i].m_row,
 					m_leaderboard.m_entries[i].m_rank,
 					m_leaderboard.m_entries[i].m_gamerTag,
-				
-					true, // 4J-JEV: Has error message to display.
-
 					app.GetString(idsErrorMessage),
-					L"", L"", L"", L"", L"", L""
+					L"", L"", L"", L"", L"", L"",
+					true // 4J-JEV: Has error message to display.
 				);
 			}
 			else
@@ -896,19 +894,18 @@ void UIScene_LeaderboardsMenu::PopulateLeaderboard(LeaderboardManager::eStatsRet
 					m_leaderboard.m_entries[i].m_row,
 					m_leaderboard.m_entries[i].m_rank,
 					m_leaderboard.m_entries[i].m_gamerTag,
-				
-					// 4J-TomK | The bDisplayMessage Flag defines if Leaderboard Data should be 
-					// displayed (false) or if a specific message (true - when data is private for example) 
-					// should be displayed. The message itself should be passed on in col0!
-					false,
-
 					m_leaderboard.m_entries[i].m_wcColumns[0],
 					m_leaderboard.m_entries[i].m_wcColumns[1],
 					m_leaderboard.m_entries[i].m_wcColumns[2],
 					m_leaderboard.m_entries[i].m_wcColumns[3],
 					m_leaderboard.m_entries[i].m_wcColumns[4],
 					m_leaderboard.m_entries[i].m_wcColumns[5],
-					m_leaderboard.m_entries[i].m_wcColumns[6]
+					m_leaderboard.m_entries[i].m_wcColumns[6],
+
+					// 4J-TomK | The bDisplayMessage Flag defines if Leaderboard Data should be 
+					// displayed (false) or if a specific message (true - when data is private for example) 
+					// should be displayed. The message itself should be passed on in col0!
+					false
 				);
 			}
 		}

@@ -3,8 +3,8 @@
 
 #include "C4JThread.h"
 #ifdef __PSVITA__
-#include "..\Minecraft.Client\PSVita\PSVitaExtras\ShutdownManager.h"
-#include "..\Minecraft.Client\PSVita\PSVitaExtras\PSVitaTLSStorage.h"
+#include "../Minecraft.Client/PSVita/PSVitaExtras/ShutdownManager.h"
+#include "../Minecraft.Client/PSVita/PSVitaExtras/PSVitaTLSStorage.h"
 
 // AP - this comes from the low level user_malloc.c file used to overide the default memory functions. These must be called when a thread is started/stopped
 extern "C" {
@@ -12,7 +12,7 @@ extern void user_registerthread();
 extern void user_removethread();
 }
 #else
-#include "..\Minecraft.Client\PS3\PS3Extras\ShutdownManager.h"
+#include "../Minecraft.Client/PS3/PS3Extras/ShutdownManager.h"
 
 #endif
 
@@ -112,6 +112,7 @@ C4JThread::C4JThread( C4JThreadStartFunc* startFunc, void* param, const char* th
 	m_threadID = sceKernelCreateThread(m_threadName, entryPoint, g_DefaultPriority, m_stackSize, 0, CPU, NULL);
 	app.DebugPrintf("***************************** start thread %s **************************\n", m_threadName);
 #else
+	m_completionFlag = new Event(Event::e_modeManualClear);
 	m_threadID = 0;
 	m_threadHandle = 0;
 	m_threadHandle = CreateThread(NULL, m_stackSize, entryPoint, this, CREATE_SUSPENDED, &m_threadID);
@@ -160,6 +161,7 @@ C4JThread::C4JThread( const char* mainThreadName)
 //	sceKernelChangeThreadPriority(m_threadID, g_DefaultPriority + 1);
 	g_DefaultCPU = SCE_KERNEL_CPU_MASK_USER_ALL;//sceKernelGetThreadCpuAffinityMask(m_threadID);
 #else
+	m_completionFlag = new Event(Event::e_modeManualClear);
 	m_threadID = GetCurrentThreadId();
 	m_threadHandle = GetCurrentThread();
 #endif
@@ -173,9 +175,7 @@ C4JThread::C4JThread( const char* mainThreadName)
 
 C4JThread::~C4JThread()
 {
-#if defined __PS3__ || defined __ORBIS__ || defined __PSVITA__
 	delete m_completionFlag;
-#endif
 
 #if defined __ORBIS__
 	scePthreadJoin(m_threadID, NULL);
@@ -243,6 +243,7 @@ DWORD WINAPI	C4JThread::entryPoint(LPVOID lpParam)
 	C4JThread* pThread = (C4JThread*)lpParam;
 	SetThreadName(-1, pThread->m_threadName);
 	pThread->m_exitCode = (*pThread->m_startFunc)(pThread->m_threadParam);
+	pThread->m_completionFlag->Set();
 	pThread->m_isRunning = false;
 	return pThread->m_exitCode;
 }
@@ -388,7 +389,7 @@ DWORD C4JThread::WaitForCompletion( int timeoutMs )
 
 //	return m_exitCode;
 #else
-	return WaitForSingleObject(m_threadHandle, timeoutMs);
+	return m_completionFlag->WaitForSignal(timeoutMs);
 #endif // __PS3__
 }
 

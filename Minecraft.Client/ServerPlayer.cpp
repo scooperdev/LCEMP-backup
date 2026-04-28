@@ -8,23 +8,23 @@
 #include "Settings.h"
 #include "PlayerList.h"
 #include "MultiPlayerLevel.h"
-#include "..\Minecraft.World\Pos.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.world.level.storage.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\Random.h"
-#include "..\Minecraft.World\net.minecraft.world.inventory.h"
-#include "..\Minecraft.World\net.minecraft.network.packet.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.projectile.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.h"
-#include "..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\Minecraft.World\net.minecraft.world.item.trading.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.item.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.entity.h"
-#include "..\Minecraft.World\net.minecraft.stats.h"
-#include "..\Minecraft.World\net.minecraft.locale.h"
-#include "..\Minecraft.World\net.minecraft.world.damagesource.h"
-#include "..\Minecraft.World\LevelChunk.h"
+#include "../Minecraft.World/Pos.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.world.level.storage.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/Random.h"
+#include "../Minecraft.World/net.minecraft.world.inventory.h"
+#include "../Minecraft.World/net.minecraft.network.packet.h"
+#include "../Minecraft.World/net.minecraft.world.entity.projectile.h"
+#include "../Minecraft.World/net.minecraft.world.entity.h"
+#include "../Minecraft.World/net.minecraft.world.item.h"
+#include "../Minecraft.World/net.minecraft.world.item.trading.h"
+#include "../Minecraft.World/net.minecraft.world.entity.item.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.entity.h"
+#include "../Minecraft.World/net.minecraft.stats.h"
+#include "../Minecraft.World/net.minecraft.locale.h"
+#include "../Minecraft.World/net.minecraft.world.damagesource.h"
+#include "../Minecraft.World/LevelChunk.h"
 #include "LevelRenderer.h"
 
 ServerPlayer::ServerPlayer(MinecraftServer *server, Level *level, const wstring& name, ServerPlayerGameMode *gameMode) : Player(level)
@@ -306,10 +306,38 @@ void ServerPlayer::doTickA()
 // 4J - split off the chunk sending bit of the tick here from ::doTick so we can do this exactly once per player per server tick
 void ServerPlayer::doChunkSendingTick(bool dontDelayChunks)
 {
-#ifdef _WINDOWS64
-	for (int _w64cs = 0; _w64cs < 4; _w64cs++)
+	int chunkSendPasses = 1;
+
+#if defined(_DEDICATED_SERVER)
+	int activePlayers = 1;
+	if (server != NULL && server->getPlayers() != NULL)
 	{
+		ServerLevel *serverLevel = server->getLevel(dimension);
+		if (serverLevel != NULL)
+		{
+			activePlayers = server->getPlayers()->getPlayerCount(serverLevel);
+		}
+	}
+	if (activePlayers < 1)
+	{
+		activePlayers = 1;
+	}
+
+	chunkSendPasses = 32 / activePlayers;
+	if (chunkSendPasses < 1)
+	{
+		chunkSendPasses = 1;
+	}
+	if (chunkSendPasses > 4)
+	{
+		chunkSendPasses = 4;
+	}
+#elif defined(_WINDOWS64)
+	chunkSendPasses = 4;
 #endif
+
+	for (int _w64cs = 0; _w64cs < chunkSendPasses; _w64cs++)
+	{
 //	printf("[%d] %s: sendChunks: %d, empty: %d\n",tickCount, connection->getNetworkPlayer()->GetUID().getOnlineID(),sendChunks,chunksToSend.empty());
 	if (!chunksToSend.empty())
 	{
@@ -461,7 +489,7 @@ void ServerPlayer::doChunkSendingTick(bool dontDelayChunks)
 					for (unsigned int i = 0; i < tes->size(); i++)
 					{
 						// 4J Stu - Added delay param to ensure that these arrive after the BRUPs from above
-						// Fix for #9169 - ART : Sign text is replaced with the words �Awaiting approval�.
+						// Fix for #9169 - ART : Sign text is replaced with the words ï¿½Awaiting approvalï¿½.
 						broadcast(tes->at(i), !connection->isLocal() && !dontDelayChunks);
 					}
 					delete tes;
@@ -469,9 +497,7 @@ void ServerPlayer::doChunkSendingTick(bool dontDelayChunks)
             }
         }
     }
-#ifdef _WINDOWS64
 	}
-#endif
 }
 
 void ServerPlayer::doTickB(bool ignorePortal)

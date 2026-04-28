@@ -3,15 +3,15 @@
 #include "MultiPlayerLocalPlayer.h"
 #include "ClientConnection.h"
 #include "MultiPlayerChunkCache.h"
-#include "..\Minecraft.World\net.minecraft.world.level.storage.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\Pos.h"
+#include "../Minecraft.World/net.minecraft.world.level.storage.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/Pos.h"
 #include "MinecraftServer.h"
 #include "ServerLevel.h"
 #include "Minecraft.h"
-#include "..\Minecraft.World\PrimedTnt.h"
-#include "..\Minecraft.World\Tile.h"
-#include "..\Minecraft.World\TileEntity.h"
+#include "../Minecraft.World/PrimedTnt.h"
+#include "../Minecraft.World/Tile.h"
+#include "../Minecraft.World/TileEntity.h"
 
 MultiPlayerLevel::ResetInfo::ResetInfo(int x, int y, int z, int tile, int data)
 {
@@ -603,18 +603,19 @@ bool MultiPlayerLevel::doSetTileAndData(int x, int y, int z, int tile, int data)
 
 void MultiPlayerLevel::disconnect(bool sendDisconnect /*= true*/)
 {
+	vector<ClientConnection *> connectionsTemp = connections;
 	if( sendDisconnect )
 	{
-		for(AUTO_VAR(it, connections.begin()); it < connections.end(); ++it )
+		for(AUTO_VAR(it, connectionsTemp.begin()); it < connectionsTemp.end(); ++it )
 		{
-			(*it)->sendAndDisconnect( shared_ptr<DisconnectPacket>( new DisconnectPacket(DisconnectPacket::eDisconnect_Quitting) ) );
+			if( *it ) (*it)->sendAndDisconnect( shared_ptr<DisconnectPacket>( new DisconnectPacket(DisconnectPacket::eDisconnect_Quitting) ) );
 		}
 	}
 	else
 	{
-		for(AUTO_VAR(it, connections.begin()); it < connections.end(); ++it )
+		for(AUTO_VAR(it, connectionsTemp.begin()); it < connectionsTemp.end(); ++it )
 		{
-			(*it)->close();
+			if( *it ) (*it)->close();
 		}
 	}
 }

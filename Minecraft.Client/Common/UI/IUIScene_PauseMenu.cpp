@@ -1,15 +1,15 @@
 #include "stdafx.h"
 #include "IUIScene_PauseMenu.h"
-#include "..\..\Minecraft.h"
-#include "..\..\MinecraftServer.h"
-#include "..\..\MultiPlayerLevel.h"
-#include "..\..\ProgressRenderer.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.phys.h"
-#include "..\..\TexturePackRepository.h"
-#include "..\..\TexturePack.h"
-#include "..\..\DLCTexturePack.h"
-#include "..\..\..\Minecraft.World\StringHelpers.h"
+#include "../../Minecraft.h"
+#include "../../MinecraftServer.h"
+#include "../../MultiPlayerLevel.h"
+#include "../../ProgressRenderer.h"
+#include "../../../Minecraft.World/net.minecraft.world.level.h"
+#include "../../../Minecraft.World/net.minecraft.world.phys.h"
+#include "../../TexturePackRepository.h"
+#include "../../TexturePack.h"
+#include "../../DLCTexturePack.h"
+#include "../../../Minecraft.World/StringHelpers.h"
 
 
 int IUIScene_PauseMenu::ExitGameDialogReturned(void *pParam,int iPad,C4JStorage::EMessageResult result)
@@ -415,6 +415,21 @@ void IUIScene_PauseMenu::_ExitWorld(LPVOID lpParameter)
 				case DisconnectPacket::eDisconnect_Kicked:
 					exitReasonStringId = IDS_DISCONNECTED_KICKED;
 					break;
+				case DisconnectPacket::eDisconnect_NotWhitelisted:
+					exitReasonStringId = IDS_DISCONNECTED_NOT_WHITELISTED;
+					exitReasonTitleId = IDS_CANTJOIN_TITLE;
+					break;
+				case DisconnectPacket::eDisconnect_ServerBanned:
+					exitReasonStringId = IDS_DISCONNECTED_SERVER_BANNED;
+					exitReasonTitleId = IDS_CANTJOIN_TITLE;
+					break;
+				case DisconnectPacket::eDisconnect_IPBanned:
+					exitReasonStringId = IDS_DISCONNECTED_IP_BANNED;
+					exitReasonTitleId = IDS_CANTJOIN_TITLE;
+					break;
+				case DisconnectPacket::eDisconnect_InvalidUsername:
+					exitReasonStringId = IDS_DISCONNECTED_INVALID_USERNAME;
+					break;
 				case DisconnectPacket::eDisconnect_NoUGC_AllLocal:
 					exitReasonStringId = IDS_NO_USER_CREATED_CONTENT_PRIVILEGE_ALL_LOCAL;
 					exitReasonTitleId = IDS_CONNECTION_FAILED;
@@ -534,6 +549,21 @@ void IUIScene_PauseMenu::_ExitWorld(LPVOID lpParameter)
 			{
 			case DisconnectPacket::eDisconnect_Kicked:
 				exitReasonStringId = IDS_DISCONNECTED_KICKED;
+				break;
+			case DisconnectPacket::eDisconnect_NotWhitelisted:
+				exitReasonStringId = IDS_DISCONNECTED_NOT_WHITELISTED;
+				exitReasonTitleId = IDS_CANTJOIN_TITLE;
+				break;
+			case DisconnectPacket::eDisconnect_ServerBanned:
+				exitReasonStringId = IDS_DISCONNECTED_SERVER_BANNED;
+				exitReasonTitleId = IDS_CANTJOIN_TITLE;
+				break;
+			case DisconnectPacket::eDisconnect_IPBanned:
+				exitReasonStringId = IDS_DISCONNECTED_IP_BANNED;
+				exitReasonTitleId = IDS_CANTJOIN_TITLE;
+				break;
+			case DisconnectPacket::eDisconnect_InvalidUsername:
+				exitReasonStringId = IDS_DISCONNECTED_INVALID_USERNAME;
 				break;
 			case DisconnectPacket::eDisconnect_NoUGC_AllLocal:
 				exitReasonStringId = IDS_NO_USER_CREATED_CONTENT_PRIVILEGE_ALL_LOCAL;

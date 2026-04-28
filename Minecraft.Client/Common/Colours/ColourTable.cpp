@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "ColourTable.h"
-#include "..\..\..\Minecraft.World\StringHelpers.h"
+#include "../../../Minecraft.World/StringHelpers.h"
 
 unordered_map<wstring,eMinecraftColour> ColourTable::s_colourNamesMap;
 
@@ -362,5 +362,31 @@ void ColourTable::setColour(const wstring &colourName, const wstring &value)
 
 unsigned int ColourTable::getColour(eMinecraftColour id)
 {
+	if (m_colourValues == NULL) {
+		switch(id) {
+			case eMinecraftColour_Potion_BaseColour: return 0x385DC6;
+			case eMinecraftColour_Effect_MovementSpeed: return 0x7CAFC6;
+			case eMinecraftColour_Effect_MovementSlowDown: return 0x5A6C81;
+			case eMinecraftColour_Effect_DigSpeed: return 0xD9C043;
+			case eMinecraftColour_Effect_DigSlowdown: return 0x4A4217;
+			case eMinecraftColour_Effect_DamageBoost: return 0x932423;
+			case eMinecraftColour_Effect_Heal: return 0xF82423;
+			case eMinecraftColour_Effect_Harm: return 0x430A09;
+			case eMinecraftColour_Effect_Jump: return 0x786297;
+			case eMinecraftColour_Effect_Confusion: return 0x551D4A;
+			case eMinecraftColour_Effect_Regeneration: return 0xCD5CAB;
+			case eMinecraftColour_Effect_DamageResistance: return 0x99453A;
+			case eMinecraftColour_Effect_FireResistance: return 0xE49A3A;
+			case eMinecraftColour_Effect_WaterBreathing: return 0x2E5299;
+			case eMinecraftColour_Effect_Invisiblity: return 0x7F8392;
+			case eMinecraftColour_Effect_Blindness: return 0x1F1F23;
+			case eMinecraftColour_Effect_NightVision: return 0x1F1FA1;
+			case eMinecraftColour_Effect_Hunger: return 0x587653;
+			case eMinecraftColour_Effect_Weakness: return 0x484D48;
+			case eMinecraftColour_Effect_Poison: return 0x4E9331;
+			default: return 0xFFFFFF;
+		}
+	}
+	
 	return m_colourValues[(int)id];
 }

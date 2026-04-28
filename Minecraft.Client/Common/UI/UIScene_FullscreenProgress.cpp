@@ -1,8 +1,8 @@
 #include "stdafx.h"
 #include "UI.h"
 #include "UIScene_FullscreenProgress.h"
-#include "..\..\Minecraft.h"
-#include "..\..\ProgressRenderer.h"
+#include "../../Minecraft.h"
+#include "../../ProgressRenderer.h"
 
 
 UIScene_FullscreenProgress::UIScene_FullscreenProgress(int iPad, void *initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
@@ -81,7 +81,37 @@ UIScene_FullscreenProgress::~UIScene_FullscreenProgress()
 	m_parentLayer->removeComponent(eUIComponent_Panorama);
 	m_parentLayer->removeComponent(eUIComponent_Logo);
 
-	delete thread;
+	if( thread != NULL )
+	{
+		int code = thread->GetExitCode();
+		DWORD exitcode = *((DWORD *)&code);
+
+		if( exitcode == STILL_ACTIVE && m_cancelFunc != NULL && !m_bWasCancelled )
+		{
+			m_bWasCancelled = true;
+			m_cancelFunc(m_cancelFuncParam);
+		}
+
+		if( exitcode == STILL_ACTIVE )
+		{
+			DWORD waitResult = thread->WaitForCompletion(m_bWaitForThreadToDelete ? INFINITE : 5000);
+			if( waitResult == WAIT_TIMEOUT )
+			{
+				//app.DebugPrintf("UIScene_FullscreenProgress: skipping active thread delete to avoid shutdown race\n");
+				thread = NULL;
+			}
+			else
+			{
+				delete thread;
+				thread = NULL;
+			}
+		}
+		else
+		{
+			delete thread;
+			thread = NULL;
+		}
+	}
 
 	delete m_CompletionData;
 }

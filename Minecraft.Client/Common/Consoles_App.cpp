@@ -1,65 +1,67 @@
-﻿
+
 #include "stdafx.h"
 
 #include <time.h>
-#include "..\..\Minecraft.World\Recipy.h"
-#include "..\..\Minecraft.Client\Options.h"
-#include "..\..\Minecraft.World\AABB.h"
-#include "..\..\Minecraft.World\Vec3.h"
-#include "..\MinecraftServer.h"
-#include "..\MultiPlayerLevel.h"
-#include "..\GameRenderer.h"
-#include "..\ProgressRenderer.h"
-#include "..\..\Minecraft.Client\LevelRenderer.h"
-#include "..\..\Minecraft.Client\MobSkinMemTextureProcessor.h"
-#include "..\..\Minecraft.Client\Minecraft.h"
-#include "..\ClientConnection.h"
-#include "..\MultiPlayerLocalPlayer.h"
-#include "..\..\Minecraft.Client\LocalPlayer.h"
-#include "..\..\Minecraft.World\Player.h"
-#include "..\..\Minecraft.World\Inventory.h"
-#include "..\..\Minecraft.World\Level.h"
-#include "..\..\Minecraft.World\FurnaceTileEntity.h"
-#include "..\..\Minecraft.World\Container.h"
-#include "..\..\Minecraft.World\DispenserTileEntity.h"
-#include "..\..\Minecraft.World\SignTileEntity.h"
-#include "..\..\Minecraft.Client\StatsCounter.h"
-#include "..\GameMode.h"
-#include "..\Xbox\Social\SocialManager.h"
-#include "Tutorial\TutorialMode.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "../../Minecraft.World/Recipy.h"
+#include "../../Minecraft.Client/Options.h"
+#include "../../Minecraft.World/AABB.h"
+#include "../../Minecraft.World/Vec3.h"
+#include "../MinecraftServer.h"
+#include "../MultiPlayerLevel.h"
+#include "../GameRenderer.h"
+#include "../ProgressRenderer.h"
+#include "../../Minecraft.Client/LevelRenderer.h"
+#include "../../Minecraft.Client/MobSkinMemTextureProcessor.h"
+#include "../../Minecraft.Client/Minecraft.h"
+#include "../ClientConnection.h"
+#include "../MultiPlayerLocalPlayer.h"
+#include "../../Minecraft.Client/LocalPlayer.h"
+#include "../../Minecraft.World/Player.h"
+#include "../../Minecraft.World/Inventory.h"
+#include "../../Minecraft.World/Level.h"
+#include "../../Minecraft.World/FurnaceTileEntity.h"
+#include "../../Minecraft.World/Container.h"
+#include "../../Minecraft.World/DispenserTileEntity.h"
+#include "../../Minecraft.World/SignTileEntity.h"
+#include "../../Minecraft.Client/StatsCounter.h"
+#include "../GameMode.h"
+#include "../Xbox/Social/SocialManager.h"
+#include "Tutorial/TutorialMode.h"
 #if defined _XBOX || defined _WINDOWS64
-#include "..\..\Minecraft.Client\Xbox\XML\ATGXmlParser.h"
-#include "..\..\Minecraft.Client\Xbox\XML\xmlFilesCallback.h"
+#include "../../Minecraft.Client/Xbox/XML/ATGXmlParser.h"
+#include "../../Minecraft.Client/Xbox/XML/xmlFilesCallback.h"
 #endif
 #include "Minecraft_Macros.h"
-#include "..\..\Minecraft.Client\PlayerList.h"
-#include "..\..\Minecraft.Client\ServerPlayer.h"
-#include "GameRules\ConsoleGameRules.h"
-#include "GameRules\ConsoleSchematicFile.h"
-#include "..\..\Minecraft.World\InputOutputStream.h"
-#include "..\..\Minecraft.World\LevelSettings.h"
-#include "..\User.h"
-#include "..\..\Minecraft.World\LevelData.h"
-#include "..\..\Minecraft.World\net.minecraft.world.entity.player.h"
-#include "..\..\Minecraft.Client\EntityRenderDispatcher.h"
-#include "..\..\Minecraft.World\compression.h"
-#include "..\TexturePackRepository.h"
-#include "..\DLCTexturePack.h"
-#include "DLC\DLCPack.h"
-#include "..\StringTable.h"
+#include "../../Minecraft.Client/PlayerList.h"
+#include "../../Minecraft.Client/ServerPlayer.h"
+#include "GameRules/ConsoleGameRules.h"
+#include "GameRules/ConsoleSchematicFile.h"
+#include "../../Minecraft.World/InputOutputStream.h"
+#include "../../Minecraft.World/LevelSettings.h"
+#include "../User.h"
+#include "../../Minecraft.World/LevelData.h"
+#include "../../Minecraft.World/net.minecraft.world.entity.player.h"
+#include "../../Minecraft.Client/EntityRenderDispatcher.h"
+#include "../../Minecraft.World/compression.h"
+#include "../TexturePackRepository.h"
+#include "../DLCTexturePack.h"
+#include "DLC/DLCPack.h"
+#include "../StringTable.h"
 #ifndef _XBOX
-#include "..\ArchiveFile.h"
+#include "../ArchiveFile.h"
 #endif
-#include "..\Minecraft.h"
+#include "../Minecraft.h"
 #ifdef _XBOX
-#include "..\Xbox\GameConfig\Minecraft.spa.h"
-#include "..\Xbox\Network\NetworkPlayerXbox.h"
-#include "XUI\XUI_TextEntry.h"
-#include "XUI\XUI_XZP_Icons.h"
-#include "XUI\XUI_PauseMenu.h"
+#include "../Xbox/GameConfig/Minecraft.spa.h"
+#include "../Xbox/Network/NetworkPlayerXbox.h"
+#include "XUI/XUI_TextEntry.h"
+#include "XUI/XUI_XZP_Icons.h"
+#include "XUI/XUI_PauseMenu.h"
 #else
-#include "UI\UI.h"
-#include "UI\UIScene_PauseMenu.h"
+#include "UI/UI.h"
+#include "UI/UIScene_PauseMenu.h"
 #endif
 #ifdef __PS3__
 #include <sys/tty.h>
@@ -68,7 +70,7 @@
 #include <save_data_dialog.h>
 #endif
 
-#include "..\Common\Leaderboards\LeaderboardManager.h"
+#include "../Common/Leaderboards/LeaderboardManager.h"
 
 //CMinecraftApp app;
 unsigned int CMinecraftApp::m_uiLastSignInData = 0;
@@ -259,7 +261,8 @@ void CMinecraftApp::DebugPrintf(const char *szFormat, ...)
 		time_t now = time(NULL);
 		struct tm t;
 		localtime_s(&t, &now);
-		printf("[%02d:%02d:%02d] [Server thread/INFO]: %s\n", t.tm_hour, t.tm_min, t.tm_sec, buf);
+		printf("%04d-%02d-%02d %02d:%02d:%02d [INFO] %s\n", t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec, buf);
+		fflush(stdout);
 	}
 #endif
 #endif
@@ -1627,6 +1630,696 @@ unsigned char CMinecraftApp::GetMinecraftLanguage(int iPad)
 	}
 }
 
+namespace
+{
+#if defined(_WINDOWS64)
+	static const unsigned short kSavedServerDefaultPort = 25565;
+	static const unsigned char kLegacySavedServerProfileVersion = 1;
+	static const int kLegacySavedServerMax = 3;
+	static const int kLegacySavedServerNameChars = 20;
+	static const int kLegacySavedServerHostChars = 32;
+	static const char kSavedServerFileMagic[4] = { 'S', 'R', 'V', '1' };
+
+	typedef struct
+	{
+		char szName[kLegacySavedServerNameChars];
+		char szHost[kLegacySavedServerHostChars];
+		unsigned short usPort;
+		unsigned char ucInUse;
+		unsigned char ucReserved;
+	}
+	WIN64_LEGACY_SAVED_SERVER_ENTRY;
+
+	typedef struct
+	{
+		unsigned char ucVersion;
+		unsigned char ucCount;
+		unsigned short usReserved;
+		WIN64_LEGACY_SAVED_SERVER_ENTRY entries[kLegacySavedServerMax];
+	}
+	WIN64_LEGACY_SAVED_SERVER_DATA;
+
+	typedef struct
+	{
+		char szMagic[4];
+		WIN64_SAVED_SERVER_DATA data;
+	}
+	WIN64_SAVED_SERVER_FILE;
+
+	typedef struct
+	{
+		bool bLoaded;
+		char szFilePath[MAX_PATH];
+		WIN64_SAVED_SERVER_DATA data;
+	}
+	WIN64_SAVED_SERVER_CACHE_ENTRY;
+
+	static WIN64_SAVED_SERVER_CACHE_ENTRY g_savedServerCacheA[XUSER_MAX_COUNT];
+
+	static bool IsDigitsOnly(const char *text)
+	{
+		if (text == NULL || text[0] == 0)
+			return false;
+
+		for (const char *it = text; *it != 0; ++it)
+		{
+			if (*it < '0' || *it > '9')
+				return false;
+		}
+
+		return true;
+	}
+
+	static bool IsValidIPv4Address(const char *host)
+	{
+		if (host == NULL || host[0] == 0)
+			return false;
+
+		int octetCount = 0;
+		const char *segmentStart = host;
+		for (const char *it = host;; ++it)
+		{
+			if (*it == '.' || *it == 0)
+			{
+				char segment[8];
+				int segLen = (int)(it - segmentStart);
+				if (segLen <= 0 || segLen >= (int)sizeof(segment))
+					return false;
+
+				memcpy(segment, segmentStart, segLen);
+				segment[segLen] = 0;
+				if (!IsDigitsOnly(segment))
+					return false;
+
+				int value = atoi(segment);
+				if (value < 0 || value > 255)
+					return false;
+
+				++octetCount;
+				if (*it == 0)
+					break;
+
+				segmentStart = it + 1;
+			}
+		}
+
+		return (octetCount == 4);
+	}
+
+	static bool IsReasonableSavedServerHost(const char *host)
+	{
+		if (host == NULL || host[0] == 0)
+			return false;
+
+		if (_stricmp(host, "localhost") == 0)
+			return true;
+
+		if (IsValidIPv4Address(host))
+			return true;
+
+		bool hasDot = false;
+		int labelLen = 0;
+		char prev = 0;
+		for (const char *it = host; *it != 0; ++it)
+		{
+			char c = *it;
+			bool isAlphaNum = ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'));
+
+			if (c == '.')
+			{
+				if (labelLen == 0 || prev == '-')
+					return false;
+				hasDot = true;
+				labelLen = 0;
+			}
+			else if (isAlphaNum || c == '-')
+			{
+				if (labelLen == 0 && c == '-')
+					return false;
+
+				++labelLen;
+				if (labelLen > 63)
+					return false;
+			}
+			else
+			{
+				return false;
+			}
+
+			prev = c;
+		}
+
+		if (labelLen == 0 || prev == '-')
+			return false;
+
+		return hasDot;
+	}
+
+	static void InitSavedServerData(WIN64_SAVED_SERVER_DATA *data)
+	{
+		if (data == NULL)
+			return;
+
+		ZeroMemory(data, sizeof(*data));
+		data->ucVersion = WIN64_SAVED_SERVER_FILE_VERSION;
+		data->ucCount = 0;
+	}
+
+	static bool NormalizeSavedServerData(WIN64_SAVED_SERVER_DATA *data)
+	{
+		if (data == NULL)
+			return false;
+
+		bool normalized = false;
+		unsigned char originalCount = data->ucCount;
+		if (data->ucVersion != WIN64_SAVED_SERVER_FILE_VERSION || data->ucCount > WIN64_SAVED_SERVER_MAX)
+		{
+			InitSavedServerData(data);
+			normalized = true;
+		}
+
+		int compactedCount = 0;
+		for (int i = 0; i < WIN64_SAVED_SERVER_MAX; ++i)
+		{
+			WIN64_SAVED_SERVER_ENTRY originalEntry = data->entries[i];
+			WIN64_SAVED_SERVER_ENTRY entry = originalEntry;
+			entry.szName[WIN64_SAVED_SERVER_NAME_CHARS - 1] = 0;
+			entry.szHost[WIN64_SAVED_SERVER_HOST_CHARS - 1] = 0;
+
+			if (entry.ucInUse == 0 || entry.szHost[0] == 0)
+				continue;
+
+			if (!IsReasonableSavedServerHost(entry.szHost))
+			{
+				normalized = true;
+				continue;
+			}
+
+			if (entry.usPort == 0)
+			{
+				entry.usPort = kSavedServerDefaultPort;
+				normalized = true;
+			}
+
+			if (entry.szName[0] == 0)
+			{
+				strncpy_s(entry.szName, WIN64_SAVED_SERVER_NAME_CHARS, entry.szHost, _TRUNCATE);
+				normalized = true;
+			}
+
+			entry.ucInUse = 1;
+			entry.ucReserved = 0;
+
+			bool duplicate = false;
+			for (int j = 0; j < compactedCount; ++j)
+			{
+				if (_stricmp(data->entries[j].szHost, entry.szHost) == 0 && data->entries[j].usPort == entry.usPort)
+				{
+					duplicate = true;
+					break;
+				}
+			}
+
+			if (duplicate)
+			{
+				normalized = true;
+				continue;
+			}
+
+			if (i != compactedCount)
+				normalized = true;
+
+			if (memcmp(&originalEntry, &entry, sizeof(entry)) != 0)
+				normalized = true;
+
+			data->entries[compactedCount++] = entry;
+		}
+
+		for (int i = compactedCount; i < WIN64_SAVED_SERVER_MAX; ++i)
+		{
+			if (data->entries[i].ucInUse != 0 || data->entries[i].szHost[0] != 0 || data->entries[i].szName[0] != 0 || data->entries[i].usPort != 0)
+				normalized = true;
+			ZeroMemory(&data->entries[i], sizeof(data->entries[i]));
+		}
+
+		data->ucCount = (unsigned char)compactedCount;
+		if (data->ucCount != originalCount)
+			normalized = true;
+
+		return normalized;
+	}
+
+	static void CopyTrimmedAscii(char *out, int outSize, const char *in)
+	{
+		if (out == NULL || outSize <= 0)
+			return;
+
+		out[0] = 0;
+		if (in == NULL)
+			return;
+
+		const char *start = in;
+		while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n')
+			++start;
+
+		const char *end = start + strlen(start);
+		while (end > start)
+		{
+			char ch = *(end - 1);
+			if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n')
+				--end;
+			else
+				break;
+		}
+
+		int len = (int)(end - start);
+		if (len <= 0)
+			return;
+
+		if (len >= outSize)
+			len = outSize - 1;
+
+		memcpy(out, start, len);
+		out[len] = 0;
+	}
+
+	static bool BuildSavedServerFilePath(int iPad, char *outPath, int outPathSize)
+	{
+		if (outPath == NULL || outPathSize <= 0)
+			return false;
+
+		char dirPath[MAX_PATH];
+#if defined(__linux__)
+		const char *baseDir = getenv("XDG_DATA_HOME");
+		if (baseDir != NULL && baseDir[0] != 0)
+		{
+			int written = snprintf(dirPath, MAX_PATH, "%s/minecraft", baseDir);
+			if (written <= 0 || written >= MAX_PATH)
+				return false;
+		}
+		else
+		{
+			baseDir = getenv("HOME");
+			if (baseDir == NULL || baseDir[0] == 0)
+				return false;
+
+			int written = snprintf(dirPath, MAX_PATH, "%s/.minecraft", baseDir);
+			if (written <= 0 || written >= MAX_PATH)
+				return false;
+		}
+#else
+		const char *baseDir = getenv("APPDATA");
+		if (baseDir == NULL || baseDir[0] == 0)
+			return false;
+
+		int written = _snprintf_s(dirPath, MAX_PATH, _TRUNCATE, "%s\\Minecraft", baseDir);
+		if (written <= 0 || written >= MAX_PATH)
+			return false;
+#endif
+
+		CreateDirectoryA(dirPath, NULL);
+
+		PlayerUID profileXuid = INVALID_XUID;
+		if (iPad >= 0 && iPad < XUSER_MAX_COUNT)
+		{
+			ProfileManager.GetXUID(iPad, &profileXuid, false);
+			if (profileXuid == INVALID_XUID)
+			{
+				ProfileManager.GetXUID(iPad, &profileXuid, true);
+			}
+		}
+
+		if (profileXuid != INVALID_XUID)
+		{
+			unsigned __int64 xuidVal = (unsigned __int64)profileXuid;
+#if defined(__linux__)
+			int written = snprintf(outPath, outPathSize, "%s/saved_servers_%016llX.dat", dirPath, (unsigned long long)xuidVal);
+#else
+			int written = _snprintf_s(outPath, outPathSize, _TRUNCATE, "%s\\saved_servers_%016llX.dat", dirPath, (unsigned long long)xuidVal);
+#endif
+			if (written <= 0 || written >= outPathSize)
+				return false;
+		}
+		else
+		{
+			int safePad = (iPad >= 0 && iPad < XUSER_MAX_COUNT) ? iPad : 0;
+#if defined(__linux__)
+			int written = snprintf(outPath, outPathSize, "%s/saved_servers_pad%d.dat", dirPath, safePad);
+#else
+			int written = _snprintf_s(outPath, outPathSize, _TRUNCATE, "%s\\saved_servers_pad%d.dat", dirPath, safePad);
+#endif
+			if (written <= 0 || written >= outPathSize)
+				return false;
+		}
+
+		return true;
+	}
+
+	static bool LoadSavedServerFile(const char *path, WIN64_SAVED_SERVER_DATA *outData)
+	{
+		if (path == NULL || path[0] == 0 || outData == NULL)
+			return false;
+
+		FILE *file = fopen(path, "rb");
+		if (file == NULL)
+			return false;
+
+		WIN64_SAVED_SERVER_FILE diskData;
+		ZeroMemory(&diskData, sizeof(diskData));
+
+		size_t bytesRead = fread(&diskData, 1, sizeof(diskData), file);
+		fclose(file);
+
+		if (bytesRead != sizeof(diskData))
+			return false;
+
+		if (memcmp(diskData.szMagic, kSavedServerFileMagic, sizeof(kSavedServerFileMagic)) != 0)
+			return false;
+
+		*outData = diskData.data;
+		return true;
+	}
+
+	static bool SaveSavedServerFile(const char *path, const WIN64_SAVED_SERVER_DATA *data)
+	{
+		if (path == NULL || path[0] == 0 || data == NULL)
+			return false;
+
+		WIN64_SAVED_SERVER_FILE diskData;
+		ZeroMemory(&diskData, sizeof(diskData));
+		memcpy(diskData.szMagic, kSavedServerFileMagic, sizeof(kSavedServerFileMagic));
+		diskData.data = *data;
+
+		FILE *file = fopen(path, "wb");
+		if (file == NULL)
+			return false;
+
+		size_t bytesWritten = fwrite(&diskData, 1, sizeof(diskData), file);
+		fclose(file);
+
+		return bytesWritten == sizeof(diskData);
+	}
+
+	static bool TryImportLegacySavedServers(const GAME_SETTINGS *settings, WIN64_SAVED_SERVER_DATA *data)
+	{
+		if (settings == NULL || data == NULL)
+			return false;
+
+		const WIN64_LEGACY_SAVED_SERVER_DATA *legacyData = (const WIN64_LEGACY_SAVED_SERVER_DATA *)&settings->ucTutorialCompletion[0];
+		if (legacyData->ucVersion != kLegacySavedServerProfileVersion || legacyData->ucCount > kLegacySavedServerMax)
+			return false;
+
+		int importedCount = 0;
+		for (int i = 0; i < kLegacySavedServerMax && importedCount < WIN64_SAVED_SERVER_MAX; ++i)
+		{
+			WIN64_LEGACY_SAVED_SERVER_ENTRY entry = legacyData->entries[i];
+			entry.szName[kLegacySavedServerNameChars - 1] = 0;
+			entry.szHost[kLegacySavedServerHostChars - 1] = 0;
+
+			if (entry.ucInUse == 0 || entry.szHost[0] == 0)
+				continue;
+
+			if (!IsReasonableSavedServerHost(entry.szHost))
+				continue;
+
+			WIN64_SAVED_SERVER_ENTRY imported;
+			ZeroMemory(&imported, sizeof(imported));
+			strncpy_s(imported.szHost, WIN64_SAVED_SERVER_HOST_CHARS, entry.szHost, _TRUNCATE);
+			if (entry.szName[0] != 0)
+				strncpy_s(imported.szName, WIN64_SAVED_SERVER_NAME_CHARS, entry.szName, _TRUNCATE);
+			else
+				strncpy_s(imported.szName, WIN64_SAVED_SERVER_NAME_CHARS, imported.szHost, _TRUNCATE);
+
+			imported.usPort = (entry.usPort == 0) ? kSavedServerDefaultPort : entry.usPort;
+			imported.ucInUse = 1;
+			imported.ucReserved = 0;
+
+			data->entries[importedCount++] = imported;
+		}
+
+		if (importedCount <= 0)
+			return false;
+
+		data->ucCount = (unsigned char)importedCount;
+		return true;
+	}
+
+	static WIN64_SAVED_SERVER_DATA *GetSavedServerData(int iPad, GAME_SETTINGS *settings)
+	{
+		if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+			return NULL;
+
+		WIN64_SAVED_SERVER_CACHE_ENTRY *cache = &g_savedServerCacheA[iPad];
+
+		char filePath[MAX_PATH];
+		if (!BuildSavedServerFilePath(iPad, filePath, MAX_PATH))
+			return NULL;
+
+		if (!cache->bLoaded || _stricmp(cache->szFilePath, filePath) != 0)
+		{
+			bool loadedFromDisk = LoadSavedServerFile(filePath, &cache->data);
+			if (!loadedFromDisk)
+			{
+				InitSavedServerData(&cache->data);
+			}
+
+			bool changed = NormalizeSavedServerData(&cache->data);
+
+			if (!loadedFromDisk)
+			{
+				WIN64_SAVED_SERVER_DATA migratedData;
+				InitSavedServerData(&migratedData);
+				if (TryImportLegacySavedServers(settings, &migratedData))
+				{
+					cache->data = migratedData;
+					changed = true;
+				}
+			}
+
+			strncpy_s(cache->szFilePath, MAX_PATH, filePath, _TRUNCATE);
+			cache->bLoaded = true;
+
+			if (changed || !loadedFromDisk)
+			{
+				SaveSavedServerFile(cache->szFilePath, &cache->data);
+			}
+		}
+
+		return &cache->data;
+	}
+
+	static bool SaveSavedServerData(int iPad)
+	{
+		if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+			return false;
+
+		WIN64_SAVED_SERVER_CACHE_ENTRY *cache = &g_savedServerCacheA[iPad];
+		if (!cache->bLoaded || cache->szFilePath[0] == 0)
+			return false;
+
+		return SaveSavedServerFile(cache->szFilePath, &cache->data);
+	}
+#endif
+}
+
+int CMinecraftApp::GetSavedServerCount(int iPad)
+{
+#if defined(_WINDOWS64)
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		iPad = ProfileManager.GetPrimaryPad();
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		return 0;
+
+	GAME_SETTINGS *settings = GameSettingsA[iPad];
+	WIN64_SAVED_SERVER_DATA *data = GetSavedServerData(iPad, settings);
+	if (data == NULL)
+		return 0;
+
+	return (int)data->ucCount;
+#else
+	(void)iPad;
+	return 0;
+#endif
+}
+
+bool CMinecraftApp::GetSavedServer(int iPad, int index, char *pName, int nameSize, char *pHost, int hostSize, unsigned short *pPort)
+{
+#if defined(_WINDOWS64)
+	if (pName != NULL && nameSize > 0)
+		pName[0] = 0;
+	if (pHost != NULL && hostSize > 0)
+		pHost[0] = 0;
+	if (pPort != NULL)
+		*pPort = 0;
+
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		iPad = ProfileManager.GetPrimaryPad();
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		return false;
+
+	GAME_SETTINGS *settings = GameSettingsA[iPad];
+	WIN64_SAVED_SERVER_DATA *data = GetSavedServerData(iPad, settings);
+	if (data == NULL || index < 0 || index >= (int)data->ucCount)
+		return false;
+
+	WIN64_SAVED_SERVER_ENTRY *entry = &data->entries[index];
+	if (entry->ucInUse == 0 || entry->szHost[0] == 0)
+		return false;
+
+	if (pName != NULL && nameSize > 0)
+		strncpy_s(pName, nameSize, entry->szName, _TRUNCATE);
+	if (pHost != NULL && hostSize > 0)
+		strncpy_s(pHost, hostSize, entry->szHost, _TRUNCATE);
+	if (pPort != NULL)
+		*pPort = entry->usPort;
+
+	return true;
+#else
+	(void)iPad;
+	(void)index;
+	(void)pName;
+	(void)nameSize;
+	(void)pHost;
+	(void)hostSize;
+	(void)pPort;
+	return false;
+#endif
+}
+
+bool CMinecraftApp::AddOrUpdateSavedServer(int iPad, const char *pszName, const char *pszHost, unsigned short usPort)
+{
+#if defined(_WINDOWS64)
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		iPad = ProfileManager.GetPrimaryPad();
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		return false;
+
+	GAME_SETTINGS *settings = GameSettingsA[iPad];
+	WIN64_SAVED_SERVER_DATA *data = GetSavedServerData(iPad, settings);
+	if (data == NULL)
+		return false;
+
+	char host[WIN64_SAVED_SERVER_HOST_CHARS];
+	CopyTrimmedAscii(host, WIN64_SAVED_SERVER_HOST_CHARS, pszHost);
+	if (host[0] == 0)
+		return false;
+
+	if (!IsReasonableSavedServerHost(host))
+		return false;
+
+	char name[WIN64_SAVED_SERVER_NAME_CHARS];
+	CopyTrimmedAscii(name, WIN64_SAVED_SERVER_NAME_CHARS, pszName);
+	if (name[0] == 0)
+		strncpy_s(name, WIN64_SAVED_SERVER_NAME_CHARS, host, _TRUNCATE);
+
+	if (usPort == 0)
+		usPort = kSavedServerDefaultPort;
+
+	WIN64_SAVED_SERVER_ENTRY newEntry;
+	ZeroMemory(&newEntry, sizeof(newEntry));
+	strncpy_s(newEntry.szName, WIN64_SAVED_SERVER_NAME_CHARS, name, _TRUNCATE);
+	strncpy_s(newEntry.szHost, WIN64_SAVED_SERVER_HOST_CHARS, host, _TRUNCATE);
+	newEntry.usPort = usPort;
+	newEntry.ucInUse = 1;
+
+	int existingIndex = -1;
+	for (int i = 0; i < (int)data->ucCount; ++i)
+	{
+		if (_stricmp(data->entries[i].szHost, host) == 0 && data->entries[i].usPort == usPort)
+		{
+			existingIndex = i;
+			break;
+		}
+	}
+
+	if (existingIndex >= 0)
+	{
+		for (int i = existingIndex; i > 0; --i)
+		{
+			data->entries[i] = data->entries[i - 1];
+		}
+		data->entries[0] = newEntry;
+	}
+	else
+	{
+		int newCount = (int)data->ucCount;
+		if (newCount < WIN64_SAVED_SERVER_MAX)
+			++newCount;
+
+		for (int i = newCount - 1; i > 0; --i)
+		{
+			data->entries[i] = data->entries[i - 1];
+		}
+		data->entries[0] = newEntry;
+		data->ucCount = (unsigned char)newCount;
+	}
+
+	NormalizeSavedServerData(data);
+	return SaveSavedServerData(iPad);
+#else
+	(void)iPad;
+	(void)pszName;
+	(void)pszHost;
+	(void)usPort;
+	return false;
+#endif
+}
+
+bool CMinecraftApp::RemoveSavedServer(int iPad, const char *pszHost, unsigned short usPort)
+{
+#if defined(_WINDOWS64)
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		iPad = ProfileManager.GetPrimaryPad();
+	if (iPad < 0 || iPad >= XUSER_MAX_COUNT)
+		return false;
+
+	GAME_SETTINGS *settings = GameSettingsA[iPad];
+	WIN64_SAVED_SERVER_DATA *data = GetSavedServerData(iPad, settings);
+	if (data == NULL || data->ucCount == 0)
+		return false;
+
+	char host[WIN64_SAVED_SERVER_HOST_CHARS];
+	CopyTrimmedAscii(host, WIN64_SAVED_SERVER_HOST_CHARS, pszHost);
+	if (host[0] == 0)
+		return false;
+
+	if (usPort == 0)
+		usPort = kSavedServerDefaultPort;
+
+	int removeIndex = -1;
+	for (int i = 0; i < (int)data->ucCount; ++i)
+	{
+		if (_stricmp(data->entries[i].szHost, host) == 0 && data->entries[i].usPort == usPort)
+		{
+			removeIndex = i;
+			break;
+		}
+	}
+
+	if (removeIndex < 0)
+		return false;
+
+	for (int i = removeIndex; i < (int)data->ucCount - 1; ++i)
+	{
+		data->entries[i] = data->entries[i + 1];
+	}
+
+	if (data->ucCount > 0)
+	{
+		--data->ucCount;
+		ZeroMemory(&data->entries[data->ucCount], sizeof(data->entries[data->ucCount]));
+	}
+
+	NormalizeSavedServerData(data);
+	return SaveSavedServerData(iPad);
+#else
+	(void)iPad;
+	(void)pszHost;
+	(void)usPort;
+	return false;
+#endif
+}
+
 void CMinecraftApp::SetGameSettings(int iPad,eGameSetting eVal,unsigned char ucVal)
 {
 	//Minecraft *pMinecraft=Minecraft::GetInstance();
@@ -2716,7 +3409,7 @@ void CMinecraftApp::HandleXuiActions(void)
 					int iPlayerC=g_NetworkManager.GetPlayerCount();				
 
 					// Since the player is exiting, let's flush any profile writes for them, and hope we're not breaking TCR 136...
-#if (defined __PS3__ || defined __ORBIS__ || defined _DURANGO  || defined __PSVITA__)
+				#if (defined __PS3__ || defined __ORBIS__ || defined _DURANGO  || defined __PSVITA__)
 					StorageManager.ForceQueuedProfileWrites(i);
 					LeaderboardManager::Instance()->OpenSession();
 					for (int j = 0; j < XUSER_MAX_COUNT; j++)
@@ -2728,9 +3421,21 @@ void CMinecraftApp::HandleXuiActions(void)
 						}
 					}
 					LeaderboardManager::Instance()->CloseSession();
-#else
+				#elif (defined _WINDOWS64)
 					ProfileManager.ForceQueuedProfileWrites(i);
-#endif
+					LeaderboardManager::Instance()->OpenSession();
+					for (int j = 0; j < XUSER_MAX_COUNT; j++)
+					{
+						if( ProfileManager.IsSignedIn(j) )
+						{
+							app.DebugPrintf("Stats save for an offline game for the player at index %d\n", 0);
+							Minecraft::GetInstance()->forceStatsSave(j);
+						}
+					}
+					LeaderboardManager::Instance()->CloseSession();
+				#else
+					ProfileManager.ForceQueuedProfileWrites(i);
+				#endif
 
 					// not required - it's done within the removeLocalPlayerIdx
 	// 				if(pMinecraft->level->isClientSide)
@@ -2949,21 +3654,33 @@ void CMinecraftApp::HandleXuiActions(void)
 				ui.HideAllGameUIElements();
 
 				// Since the player forced the exit, let's flush any profile writes, and hope we're not breaking TCR 136...
-#if (defined __PS3__ || defined __ORBIS__  || defined _DURANGO  || defined __PSVITA__)
-				StorageManager.ForceQueuedProfileWrites();
-				LeaderboardManager::Instance()->OpenSession();
-				for (int j = 0; j < XUSER_MAX_COUNT; j++)
-				{
-					if( ProfileManager.IsSignedIn(j) )
+				#if (defined __PS3__ || defined __ORBIS__  || defined _DURANGO  || defined __PSVITA__)
+					StorageManager.ForceQueuedProfileWrites();
+					LeaderboardManager::Instance()->OpenSession();
+					for (int j = 0; j < XUSER_MAX_COUNT; j++)
 					{
-						app.DebugPrintf("Stats save for an offline game for the player at index %d\n", 0);
-						Minecraft::GetInstance()->forceStatsSave(j);
+						if( ProfileManager.IsSignedIn(j) )
+						{
+							app.DebugPrintf("Stats save for an offline game for the player at index %d\n", 0);
+							Minecraft::GetInstance()->forceStatsSave(j);
+						}
 					}
-				}
-				LeaderboardManager::Instance()->CloseSession(); 
-#elif (defined _XBOX)
-				ProfileManager.ForceQueuedProfileWrites();
-#endif
+					LeaderboardManager::Instance()->CloseSession(); 
+				#elif (defined _XBOX)
+					ProfileManager.ForceQueuedProfileWrites();
+				#elif (defined _WINDOWS64)
+					ProfileManager.ForceQueuedProfileWrites();
+					LeaderboardManager::Instance()->OpenSession();
+					for (int j = 0; j < XUSER_MAX_COUNT; j++)
+					{
+						if( ProfileManager.IsSignedIn(j) )
+						{
+							app.DebugPrintf("Stats save for an offline game for the player at index %d\n", 0);
+							Minecraft::GetInstance()->forceStatsSave(j);
+						}
+					}
+					LeaderboardManager::Instance()->CloseSession();
+				#endif
 
 				// 4J-PB - cancel any possible string verifications queued with LIVE
 				//InputManager.CancelAllVerifyInProgress();
@@ -4290,6 +5007,18 @@ int CMinecraftApp::SignoutExitWorldThreadProc( void* lpParameter )
 			case DisconnectPacket::eDisconnect_Kicked:
 				exitReasonStringId = IDS_DISCONNECTED_KICKED;
 				break;
+			case DisconnectPacket::eDisconnect_NotWhitelisted:
+				exitReasonStringId = IDS_DISCONNECTED_NOT_WHITELISTED;
+				break;
+			case DisconnectPacket::eDisconnect_ServerBanned:
+				exitReasonStringId = IDS_DISCONNECTED_SERVER_BANNED;
+				break;
+			case DisconnectPacket::eDisconnect_IPBanned:
+				exitReasonStringId = IDS_DISCONNECTED_IP_BANNED;
+				break;
+			case DisconnectPacket::eDisconnect_InvalidUsername:
+				exitReasonStringId = IDS_DISCONNECTED_INVALID_USERNAME;
+				break;
 			case DisconnectPacket::eDisconnect_NoUGC_AllLocal:
 				exitReasonStringId = IDS_NO_USER_CREATED_CONTENT_PRIVILEGE_ALL_LOCAL;
 				break;
@@ -4345,6 +5074,18 @@ int CMinecraftApp::SignoutExitWorldThreadProc( void* lpParameter )
 			{
 			case DisconnectPacket::eDisconnect_Kicked:
 				exitReasonStringId = IDS_DISCONNECTED_KICKED;
+				break;
+			case DisconnectPacket::eDisconnect_NotWhitelisted:
+				exitReasonStringId = IDS_DISCONNECTED_NOT_WHITELISTED;
+				break;
+			case DisconnectPacket::eDisconnect_ServerBanned:
+				exitReasonStringId = IDS_DISCONNECTED_SERVER_BANNED;
+				break;
+			case DisconnectPacket::eDisconnect_IPBanned:
+				exitReasonStringId = IDS_DISCONNECTED_IP_BANNED;
+				break;
+			case DisconnectPacket::eDisconnect_InvalidUsername:
+				exitReasonStringId = IDS_DISCONNECTED_INVALID_USERNAME;
 				break;
 			case DisconnectPacket::eDisconnect_NoUGC_AllLocal:
 				exitReasonStringId = IDS_NO_USER_CREATED_CONTENT_PRIVILEGE_ALL_LOCAL;
@@ -7587,6 +8328,17 @@ void CMinecraftApp::SetGameHostOption(unsigned int &uiHostSettings, eGameHostOpt
 			uiHostSettings&=~GAME_HOST_OPTION_BITMASK_DISABLESAVE;
 		}
 		break;
+	case eGameHostOption_ChatDisabled:
+		if(uiVal!=0)
+		{
+			uiHostSettings|=GAME_HOST_OPTION_BITMASK_CHATDISABLED;
+		}
+		else
+		{
+			// off
+			uiHostSettings&=~GAME_HOST_OPTION_BITMASK_CHATDISABLED;
+		}
+		break;
 	case eGameHostOption_All:
 		uiHostSettings=uiVal;
 		break;
@@ -7664,6 +8416,9 @@ unsigned int CMinecraftApp::GetGameHostOption(unsigned int uiHostSettings, eGame
 	case eGameHostOption_DisableSaving:
 		return (uiHostSettings&GAME_HOST_OPTION_BITMASK_DISABLESAVE);
 		break;		
+	case eGameHostOption_ChatDisabled:
+		return (uiHostSettings&GAME_HOST_OPTION_BITMASK_CHATDISABLED);
+		break;
 	}
 
 	return false;
@@ -8694,8 +9449,16 @@ bool CMinecraftApp::DLCContentRetrieved(eDLCMarketplaceType eType)
 
 void CMinecraftApp::SetAdditionalSkinBoxes(DWORD dwSkinID, SKIN_BOX *SkinBoxA, DWORD dwSkinBoxC)
 {
-	EntityRenderer *renderer = EntityRenderDispatcher::instance->getRenderer(eTYPE_PLAYER);
-	Model *pModel = renderer->getModel();
+	EntityRenderer *renderer = NULL;
+	Model *pModel = NULL;
+	
+	if (EntityRenderDispatcher::instance != NULL) {
+		renderer = EntityRenderDispatcher::instance->getRenderer(eTYPE_PLAYER);
+		if (renderer != NULL) {
+			pModel = renderer->getModel();
+		}
+	}
+	
 	vector<ModelPart *> *pvModelPart = new vector<ModelPart *>;
 	vector<SKIN_BOX *> *pvSkinBoxes = new vector<SKIN_BOX *>;
 
@@ -8726,8 +9489,16 @@ void CMinecraftApp::SetAdditionalSkinBoxes(DWORD dwSkinID, SKIN_BOX *SkinBoxA, D
 
 vector<ModelPart *> * CMinecraftApp::SetAdditionalSkinBoxes(DWORD dwSkinID, vector<SKIN_BOX *> *pvSkinBoxA)
 {
-	EntityRenderer *renderer = EntityRenderDispatcher::instance->getRenderer(eTYPE_PLAYER);
-	Model *pModel = renderer->getModel();
+	EntityRenderer *renderer = NULL;
+	Model *pModel = NULL;
+	
+	if (EntityRenderDispatcher::instance != NULL) {
+		renderer = EntityRenderDispatcher::instance->getRenderer(eTYPE_PLAYER);
+		if (renderer != NULL) {
+			pModel = renderer->getModel();
+		}
+	}
+	
 	vector<ModelPart *> *pvModelPart = new vector<ModelPart *>;
 
 	EnterCriticalSection( &csAdditionalModelParts );

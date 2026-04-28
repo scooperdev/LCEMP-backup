@@ -1,11 +1,11 @@
 #include "stdafx.h"
 
-#ifdef _DEBUG_MENUS_ENABLED
+#if defined(_DEBUG_MENUS_ENABLED) && !defined(_CONTENT_PACKAGE)
 #include "UI.h"
 #include "UIScene_DebugSetCamera.h"
 #include "Minecraft.h"
 #include "MultiPlayerLocalPlayer.h"
-#include "..\..\..\Minecraft.World\StringHelpers.h"
+#include "../../../Minecraft.World/StringHelpers.h"
 
 UIScene_DebugSetCamera::UIScene_DebugSetCamera(int iPad, void *initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
 {
@@ -101,7 +101,11 @@ void UIScene_DebugSetCamera::handlePress(F64 controlId, F64 childId)
 	case eControl_YRot:
 	case eControl_Elevation:
 		m_keyboardCallbackControl = (eControls)((int)controlId);	
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::Request(L"Enter something", L"", (DWORD)0, 25, &UIScene_DebugSetCamera::KeyboardCompleteCallback, this, C_4JInput::EKeyboardMode_Default);
+	#else
 		InputManager.RequestKeyboard(L"Enter something",L"",(DWORD)0,25,&UIScene_DebugSetCamera::KeyboardCompleteCallback,this,C_4JInput::EKeyboardMode_Default);
+	#endif
 		break;
 	};
 }
@@ -121,7 +125,11 @@ int UIScene_DebugSetCamera::KeyboardCompleteCallback(LPVOID lpParam,bool bRes)
 	UIScene_DebugSetCamera *pClass=(UIScene_DebugSetCamera *)lpParam;
 	uint16_t pchText[2048];//[128];
 	ZeroMemory(pchText, 2048/*128*/ * sizeof(uint16_t) );
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::GetText(pchText);
+	#else
 	InputManager.GetText(pchText);
+	#endif
 
 	if(pchText[0]!=0)
 	{

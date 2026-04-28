@@ -1,13 +1,13 @@
 #include "stdafx.h"
 #include "compression.h"
-#if defined __ORBIS__ || defined __PS3__ || defined _DURANGO || defined _WIN64
-#include "..\Minecraft.Client\Common\zlib\zlib.h"
+#if defined __linux__ || defined __ORBIS__ || defined __PS3__ || defined _DURANGO || defined _WIN64
+#include "../Minecraft.Client/Common/zlib/zlib.h"
 #endif
 
 #if defined __PSVITA__
-#include "..\Minecraft.Client\PSVita\PSVitaExtras\zlib.h"
+#include "../Minecraft.Client/PSVita/PSVitaExtras/zlib.h"
 #elif defined __PS3__
-#include "..\Minecraft.Client\PS3\PS3Extras\EdgeZLib.h"
+#include "../Minecraft.Client/PS3/PS3Extras/EdgeZLib.h"
 #endif //__PS3__
 
 
@@ -323,7 +323,7 @@ HRESULT Compression::DecompressRLE(void *pDestination, unsigned int *pDestSize, 
 HRESULT Compression::Compress(void *pDestination, unsigned int *pDestSize, void *pSource, unsigned int SrcSize)
 {
 	// Using zlib for x64 compression - 360 is using native 360 compression and PS3 a stubbed non-compressing version of this
-#if defined __ORBIS__ || defined _DURANGO || defined _WIN64 || defined __PSVITA__
+#if defined __ORBIS__ || defined _DURANGO || defined _WIN64 || defined __PSVITA__ || defined __linux__
 	SIZE_T destSize = (SIZE_T)(*pDestSize);
 	int res = ::compress((Bytef *)pDestination, (uLongf *)&destSize, (Bytef *)pSource, SrcSize);
 	*pDestSize = (unsigned int)destSize;
@@ -351,7 +351,7 @@ HRESULT Compression::Decompress(void *pDestination, unsigned int *pDestSize, voi
 	}
 
 	// Using zlib for x64 compression - 360 is using native 360 compression and PS3 a stubbed non-compressing version of this
-#if defined __ORBIS__ || defined _DURANGO || defined _WIN64 || defined __PSVITA__
+#if defined __ORBIS__ || defined _DURANGO || defined _WIN64 || defined __PSVITA__ || defined __linux__
 	SIZE_T destSize = (SIZE_T)(*pDestSize);
 	int res = ::uncompress((Bytef *)pDestination, (uLongf *)&destSize, (Bytef *)pSource, SrcSize);
 	*pDestSize = (unsigned int)destSize;
@@ -504,7 +504,7 @@ HRESULT Compression::DecompressWithType(void *pDestination, unsigned int *pDestS
 Compression::Compression()
 {
 	// Using zlib for x64 compression - 360 is using native 360 compression and PS3 a stubbed non-compressing version of this
-#if !(defined __ORBIS__ || defined __PS3__)
+#if !(defined __ORBIS__ || defined __PS3__ || defined __linux__)
 	// The default parameters for compression context allocated about 6.5MB, reducing the partition size here from the default 512KB to 128KB
 	// brings this down to about 3MB
 	XMEMCODEC_PARAMETERS_LZX params;
@@ -531,7 +531,7 @@ Compression::Compression()
 
 Compression::~Compression()
 {
-#if !(defined __ORBIS__ || defined __PS3__ || defined __PSVITA__)
+#if !(defined __ORBIS__ || defined __PS3__ || defined __PSVITA__ || defined __linux__)
 
 	XMemDestroyCompressionContext(compressionContext);
 	XMemDestroyDecompressionContext(decompressionContext);

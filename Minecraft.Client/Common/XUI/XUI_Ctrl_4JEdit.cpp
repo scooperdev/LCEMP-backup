@@ -1,5 +1,6 @@
 #include  "stdafx.h"
 #include "XUI_Ctrl_4JEdit.h"
+#include "../UI/UIScene_Keyboard.h"
 
 
 
@@ -159,7 +160,12 @@ HRESULT CXuiCtrl4JEdit::OnKeyDown(XUIMessageInput* pInputData, BOOL& rfHandled)
 
 void CXuiCtrl4JEdit::RequestKeyboard(int iPad)
 {
+	#ifdef _WINDOWS64
+		const wchar_t *title = (m_uiTitle != 0) ? app.GetString(m_uiTitle) : L"";
+		Win64InGameKeyboard::Request(title, GetText(), (unsigned int)iPad, m_uTextLimit, &CXuiCtrl4JEdit::KeyboardReturned, this, m_eKeyboardMode, wchText, m_uTextLimit + 1);
+	#else
 	InputManager.RequestKeyboard(m_uiTitle,GetText(),m_uiText,iPad,wchText,m_uTextLimit+1,&CXuiCtrl4JEdit::KeyboardReturned,this,m_eKeyboardMode,app.GetStringTable());
+	#endif
 }
 
 

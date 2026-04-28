@@ -7,12 +7,20 @@
 #include "net.minecraft.world.level.h"
 #include "LevelData.h"
 
+StructureFeature::StructureFeature()
+{
+	InitializeCriticalSectionAndSpinCount(&m_csCachedStructures, 4000);
+}
+
 StructureFeature::~StructureFeature()
 {
+	EnterCriticalSection(&m_csCachedStructures);
 	for( AUTO_VAR(it, cachedStructures.begin()); it != cachedStructures.end(); it++ )
 	{
 		delete it->second;
 	}
+	LeaveCriticalSection(&m_csCachedStructures);
+	DeleteCriticalSection(&m_csCachedStructures);
 }
 
 void StructureFeature::addFeature(Level *level, int x, int z, int xOffs, int zOffs, byteArray blocks)
@@ -21,10 +29,13 @@ void StructureFeature::addFeature(Level *level, int x, int z, int xOffs, int zOf
     // the chunk being generated, but not all chunks are the sources of
     // structures
 
+	EnterCriticalSection(&m_csCachedStructures);
 	if (cachedStructures.find(ChunkPos::hashCode(x, z)) != cachedStructures.end())
 	{
+		LeaveCriticalSection(&m_csCachedStructures);
         return;
     }
+	LeaveCriticalSection(&m_csCachedStructures);
 
     // clear random key
     random->nextInt();
@@ -32,7 +43,9 @@ void StructureFeature::addFeature(Level *level, int x, int z, int xOffs, int zOf
     if (isFeatureChunk(x, z,level->getLevelData()->getGenerator() == LevelType::lvl_flat))
 	{
         StructureStart *start = createStructureStart(x, z);
+		EnterCriticalSection(&m_csCachedStructures);
         cachedStructures[ChunkPos::hashCode(x, z)] = start;
+		LeaveCriticalSection(&m_csCachedStructures);
     }
 }
 
@@ -46,6 +59,7 @@ bool StructureFeature::postProcess(Level *level, Random *random, int chunkX, int
     int cz = (chunkZ << 4); // + 8;
 
     bool intersection = false;
+	EnterCriticalSection(&m_csCachedStructures);
 	for( AUTO_VAR(it, cachedStructures.begin()); it != cachedStructures.end(); it++ )
 	{
 		StructureStart *structureStart = it->second;
@@ -61,12 +75,14 @@ bool StructureFeature::postProcess(Level *level, Random *random, int chunkX, int
             }
         }
     }
+	LeaveCriticalSection(&m_csCachedStructures);
 
     return intersection;
 }
 
 bool StructureFeature::isIntersection(int cellX, int cellZ)
 {
+	EnterCriticalSection(&m_csCachedStructures);
 	for( AUTO_VAR(it, cachedStructures.begin()); it != cachedStructures.end(); it++ )
 	{
 		StructureStart *structureStart = it->second;
@@ -80,12 +96,14 @@ bool StructureFeature::isIntersection(int cellX, int cellZ)
                     StructurePiece *next = *it2++;
                     if (next->getBoundingBox()->intersects(cellX, cellZ, cellX, cellZ))
 					{
+						LeaveCriticalSection(&m_csCachedStructures);
                         return true;
                     }
                 }
             }
         }
     }
+	LeaveCriticalSection(&m_csCachedStructures);
     return false;
 }
 
@@ -94,7 +112,7 @@ bool StructureFeature::isIntersection(int cellX, int cellZ)
 ///////////////////////////////////////////
 bool StructureFeature::isInsideFeature(int cellX, int cellY, int cellZ) 
 {
-	//for (StructureStart structureStart : cachedStructures.values()) 
+	EnterCriticalSection(&m_csCachedStructures);
 	for(AUTO_VAR(it, cachedStructures.begin()); it != cachedStructures.end(); ++it)
 	{
 		StructureStart *pStructureStart = it->second;
@@ -103,14 +121,6 @@ bool StructureFeature::isInsideFeature(int cellX, int cellY, int cellZ)
 		{
 			if (pStructureStart->getBoundingBox()->intersects(cellX, cellZ, cellX, cellZ)) 
 			{
-				/*
-				Iterator<StructurePiece> it = structureStart.getPieces().iterator();
-				while (it.hasNext()) {
-				StructurePiece next = it.next();
-				if (next.getBoundingBox().isInside(cellX, cellY, cellZ)) {
-				return true;
-				}
-				*/
 				list<StructurePiece *> *pieces=pStructureStart->getPieces();
 
 				for ( AUTO_VAR(it2, pieces->begin()); it2 != pieces->end(); it2++ )
@@ -118,12 +128,14 @@ bool StructureFeature::isInsideFeature(int cellX, int cellY, int cellZ)
 					StructurePiece* piece = *it2;
 					if ( piece->getBoundingBox()->isInside(cellX, cellY, cellZ)  )
 					{
+						LeaveCriticalSection(&m_csCachedStructures);
 						return true;
 					}
 				}
 			}
 		}
 	}
+	LeaveCriticalSection(&m_csCachedStructures);
 	return false;
 }
 
@@ -146,6 +158,7 @@ TilePos *StructureFeature::getNearestGeneratedFeature(Level *level, int cellX, i
 	double minDistance = DBL_MAX;
 	TilePos *selected = NULL;
 
+	EnterCriticalSection(&m_csCachedStructures);
 	for(AUTO_VAR(it, cachedStructures.begin()); it != cachedStructures.end(); ++it)
 	{
 		StructureStart *pStructureStart = it->second;
@@ -169,6 +182,7 @@ TilePos *StructureFeature::getNearestGeneratedFeature(Level *level, int cellX, i
 			}
 		}
 	}
+	LeaveCriticalSection(&m_csCachedStructures);
 	if (selected != NULL) 
 	{
 		return selected;

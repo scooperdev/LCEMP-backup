@@ -602,9 +602,10 @@ bool SparseDataStorage::isCompressed()
 
 void SparseDataStorage::write(DataOutputStream *dos)
 {
-	int count = ( dataAndCount >> 48 ) & 0xffff;
+	__int64 snapshot = dataAndCount;
+	int count = ( snapshot >> 48 ) & 0xffff;
 	dos->writeInt(count);
-	unsigned char *dataPointer = (unsigned char *)(dataAndCount & 0x0000ffffffffffff);
+	unsigned char *dataPointer = (unsigned char *)(snapshot & 0x0000ffffffffffff);
 	byteArray wrapper(dataPointer, count * 128 + 128);
 	dos->write(wrapper);
 }

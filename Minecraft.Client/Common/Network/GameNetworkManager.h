@@ -2,21 +2,21 @@
 using namespace std;
 #include <vector>
 #include <qnet.h>
-#include "..\..\..\Minecraft.World\C4JThread.h"
+#include "../../../Minecraft.World/C4JThread.h"
 #include "NetworkPlayerInterface.h"
 #ifdef _XBOX
-#include "..\..\Xbox\Network\PlatformNetworkManagerXbox.h"
+#include "../../Xbox/Network/PlatformNetworkManagerXbox.h"
 #elif defined __PS3__ || defined __ORBIS__ || defined __PSVITA__
-#include "..\..\Common\Network\Sony\PlatformNetworkManagerSony.h"
+#include "../../Common/Network/Sony/PlatformNetworkManagerSony.h"
 #elif defined _DURANGO
-#include "..\..\Durango\Network\PlatformNetworkManagerDurango.h"
+#include "../../Durango/Network/PlatformNetworkManagerDurango.h"
 #else
 #include "PlatformNetworkManagerStub.h"
 #endif
 #include "SessionInfo.h"
 
 #ifdef __ORBIS__
-#include "..\..\Orbis\Network\PsPlusUpsellWrapper_Orbis.h"
+#include "../../Orbis/Network/PsPlusUpsellWrapper_Orbis.h"
 #endif
 
 class ClientConnection;
@@ -46,7 +46,8 @@ public:
 	{
 		JOINGAME_SUCCESS,
 		JOINGAME_FAIL_GENERAL,
-		JOINGAME_FAIL_SERVER_FULL
+		JOINGAME_FAIL_SERVER_FULL,
+		JOINGAME_PENDING
 	} eJoinGameResult;
 
 	void			Initialise();
@@ -103,7 +104,8 @@ public:
 	// Session joining and leaving
 
 	bool			JoinGameFromInviteInfo( int userIndex, int userMask, const INVITE_INFO *pInviteInfo);
-	eJoinGameResult	JoinGame(FriendSessionInfo *searchResult, int localUsersMask);	
+	eJoinGameResult	JoinGame(FriendSessionInfo *searchResult, int localUsersMask);
+	bool			IsJoinPending();
 	static void		CancelJoinGame(LPVOID lpParam); // Not part of the shared interface
 	bool			LeaveGame(bool bMigrateHost);
 	static int		JoinFromInvite_SignInReturned(void *pParam,bool bContinue, int iPad);

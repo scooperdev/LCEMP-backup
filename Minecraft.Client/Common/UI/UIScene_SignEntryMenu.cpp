@@ -1,12 +1,12 @@
 #include "stdafx.h"
 #include "UI.h"
 #include "UIScene_SignEntryMenu.h"
-#include "..\..\Minecraft.h"
-#include "..\..\MultiPlayerLocalPlayer.h"
-#include "..\..\MultiPlayerLevel.h"
-#include "..\..\ClientConnection.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.level.tile.entity.h"
+#include "../../Minecraft.h"
+#include "../../MultiPlayerLocalPlayer.h"
+#include "../../MultiPlayerLevel.h"
+#include "../../ClientConnection.h"
+#include "../../../Minecraft.World/net.minecraft.world.level.h"
+#include "../../../Minecraft.World/net.minecraft.world.level.tile.entity.h"
 
 UIScene_SignEntryMenu::UIScene_SignEntryMenu(int iPad, void *_initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
 {
@@ -150,7 +150,11 @@ int UIScene_SignEntryMenu::KeyboardCompleteCallback(LPVOID lpParam,bool bRes)
 	{
 		uint16_t pchText[128];
 		ZeroMemory(pchText, 128 * sizeof(uint16_t) );
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::GetText(pchText);
+	#else
 		InputManager.GetText(pchText);
+	#endif
 		pchText[15] = 0;
 		pClass->m_textInputLines[pClass->m_iEditingLine].setLabel((wchar_t *)pchText);
 	}
@@ -173,7 +177,9 @@ void UIScene_SignEntryMenu::handlePress(F64 controlId, F64 childId)
 		{
 			m_iEditingLine = (int)controlId;
 			m_bIgnoreInput = true;
-#ifdef _XBOX_ONE
+#ifdef _WINDOWS64
+			Win64InGameKeyboard::Request(app.GetString(IDS_SIGN_TITLE), m_textInputLines[m_iEditingLine].getLabel(), (DWORD)m_iPad, 15, &UIScene_SignEntryMenu::KeyboardCompleteCallback, this, C_4JInput::EKeyboardMode_Alphabet);
+#elif defined(_XBOX_ONE)
 			// 4J-PB - Xbox One uses the Windows virtual keyboard, and doesn't have the Xbox 360 Latin keyboard type, so we can't restrict the input set to alphanumeric. The closest we get is the emailSmtpAddress type.
 			int language = XGetLanguage();
 			switch(language)

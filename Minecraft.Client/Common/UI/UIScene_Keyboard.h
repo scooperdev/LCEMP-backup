@@ -1,11 +1,52 @@
 #pragma once
 
 #include "UIScene.h"
+#include "UIControl_Label.h"
+#include "UIControl_TextInput.h"
+#include "UIControl_Button.h"
+#include <stdint.h>
+
+struct UIScene_KeyboardInitData
+{
+	wstring title;
+	wstring initialText;
+	unsigned int maxChars;
+};
+
+namespace Win64InGameKeyboard
+{
+	typedef int (*KeyboardCallback)(void *, const bool);
+
+	bool Request(const wchar_t *title,
+		const wchar_t *initialText,
+		unsigned int iPad,
+		unsigned int maxChars,
+		KeyboardCallback callback,
+		void *callbackParam,
+		int keyboardMode,
+		wchar_t *outputBuffer = NULL,
+		unsigned int outputBufferChars = 0);
+
+	void Complete(bool accepted, const wchar_t *text);
+	void GetText(uint16_t *utf16Text);
+	void OnChar(wchar_t ch);
+	void OnVirtualKeyDown(unsigned int vk);
+	bool ConsumeSubmitRequested();
+	bool ConsumeTextChanged();
+	bool ConsumeCursorLeftRequested();
+	bool ConsumeCursorRightRequested();
+	bool ConsumeCancelRequested();
+	bool PopChar(wchar_t *outCh);
+	bool IsActive();
+}
 
 class UIScene_Keyboard : public UIScene
 {
 private:
 	bool m_bKeyboardDonePressed;
+	bool m_bKeyboardResultSent;
+	int m_charLimit;
+	UIScene *m_pMenuBackground;
 
 protected:
 	UIControl_Label m_EnterTextLabel;
@@ -43,6 +84,7 @@ public:
 	UIScene_Keyboard(int iPad, void *initData, UILayer *parentLayer);
 	~UIScene_Keyboard();
 
+	virtual void tick();
 	virtual void updateTooltips();
 
 	virtual bool allowRepeat(int key);
@@ -75,5 +117,5 @@ public:
 #endif
 
 	// Returns true if lower scenes in this scenes layer, or in any layer below this scenes layers should be hidden
-	virtual bool hidesLowerScenes() { return false; }
+	virtual bool hidesLowerScenes() { return true; }
 };

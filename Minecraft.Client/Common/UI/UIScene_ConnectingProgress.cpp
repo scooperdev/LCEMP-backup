@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "UI.h"
 #include "UIScene_ConnectingProgress.h"
-#include "..\..\Minecraft.h"
+#include "../../Minecraft.h"
 
 UIScene_ConnectingProgress::UIScene_ConnectingProgress(int iPad, void *_initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
 {
@@ -131,6 +131,18 @@ void UIScene_ConnectingProgress::handleTimerComplete(int id)
 			break;
 		case DisconnectPacket::eDisconnect_Kicked:
 			exitReasonStringId = IDS_DISCONNECTED_KICKED;
+			break;
+		case DisconnectPacket::eDisconnect_NotWhitelisted:
+			exitReasonStringId = IDS_DISCONNECTED_NOT_WHITELISTED;
+			break;
+		case DisconnectPacket::eDisconnect_ServerBanned:
+			exitReasonStringId = IDS_DISCONNECTED_SERVER_BANNED;
+			break;
+		case DisconnectPacket::eDisconnect_IPBanned:
+			exitReasonStringId = IDS_DISCONNECTED_IP_BANNED;
+			break;
+		case DisconnectPacket::eDisconnect_InvalidUsername:
+			exitReasonStringId = IDS_DISCONNECTED_INVALID_USERNAME;
 			break;
 		case DisconnectPacket::eDisconnect_NoUGC_AllLocal:
 			exitReasonStringId = IDS_NO_USER_CREATED_CONTENT_PRIVILEGE_ALL_LOCAL;

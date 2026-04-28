@@ -1,4 +1,4 @@
-﻿/* SCE CONFIDENTIAL
+/* SCE CONFIDENTIAL
  PlayStation(R)4 Programmer Tool Runtime Library Release 01.600.051
  * Copyright (C) 2013 Sony Computer Entertainment Inc.
  * All Rights Reserved.
@@ -9,7 +9,7 @@ extern "C"
 #include <stdlib.h>
 #include <mspace.h>
 #include <kernel.h>
-#include "..\Minecraft.World\System.h"
+#include "../Minecraft.World/System.h"
 
 static size_t s_heapLength;
 static size_t s_memLength;

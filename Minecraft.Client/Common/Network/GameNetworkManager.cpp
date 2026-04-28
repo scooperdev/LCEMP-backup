@@ -1,43 +1,44 @@
 #include "stdafx.h"
-#include "..\..\..\Minecraft.World\StringHelpers.h"
-#include "..\..\..\Minecraft.World\AABB.h"
-#include "..\..\..\Minecraft.World\Vec3.h"
-#include "..\..\..\Minecraft.World\Socket.h"
-#include "..\..\..\Minecraft.World\ThreadName.h"
-#include "..\..\..\Minecraft.World\Entity.h"
-#include "..\..\..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\..\ClientConnection.h"
-#include "..\..\Minecraft.h"
-#include "..\..\User.h"
-#include "..\..\MinecraftServer.h"
-#include "..\..\PlayerList.h"
-#include "..\..\ServerPlayer.h"
-#include "..\..\PlayerConnection.h"
-#include "..\..\MultiPlayerLevel.h"
-#include "..\..\ProgressRenderer.h"
-#include "..\..\MultiPlayerLocalPlayer.h"
-#include "..\..\..\Minecraft.World\DisconnectPacket.h"
-#include "..\..\..\Minecraft.World\compression.h"
-#include "..\..\..\Minecraft.World\OldChunkStorage.h"
-#include "..\..\TexturePackRepository.h"
-#include "..\..\TexturePack.h"
+#include "../../../Minecraft.World/StringHelpers.h"
+#include "../../../Minecraft.World/AABB.h"
+#include "../../../Minecraft.World/Vec3.h"
+#include "../../../Minecraft.World/Socket.h"
+#include "../../../Minecraft.World/ThreadName.h"
+#include "../../../Minecraft.World/Entity.h"
+#include "../../../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../../ClientConnection.h"
+#include "../../Minecraft.h"
+#include "../../User.h"
+#include "../../MinecraftServer.h"
+#include "../../PlayerList.h"
+#include "../../ServerPlayer.h"
+#include "../../PlayerConnection.h"
+#include "../../MultiPlayerLevel.h"
+#include "../../ProgressRenderer.h"
+#include "../../MultiPlayerLocalPlayer.h"
+#include "../../../Minecraft.World/DisconnectPacket.h"
+#include "../../../Minecraft.World/compression.h"
+#include "../../../Minecraft.World/OldChunkStorage.h"
+#include "../../TexturePackRepository.h"
+#include "../../TexturePack.h"
 
-#include "..\..\Gui.h"
-#include "..\..\LevelRenderer.h"
-#include "..\..\..\Minecraft.World\IntCache.h"
-#include "..\GameRules\ConsoleGameRules.h"
+#include "../../Gui.h"
+#include "../../LevelRenderer.h"
+#include "../../../Minecraft.World/IntCache.h"
+#include "../GameRules/ConsoleGameRules.h"
 #include "GameNetworkManager.h"
 
 #ifdef _XBOX
-#include "Common\XUI\XUI_PauseMenu.h"
+#include "Common/XUI/XUI_PauseMenu.h"
 #elif !(defined __PSVITA__)
-#include "Common\UI\UI.h"
-#include "Common\UI\UIScene_PauseMenu.h"
-#include "..\..\Xbox\Network\NetworkPlayerXbox.h"
+#include "Common/UI/UI.h"
+#include "Common/UI/UIScene_PauseMenu.h"
+#include "../../Xbox/Network/NetworkPlayerXbox.h"
+#include "PlatformNetworkManagerStub.h"
 #endif
 
 #ifdef _DURANGO
-#include "..\Minecraft.World\DurangoStats.h"
+#include "../Minecraft.World/DurangoStats.h"
 #endif
 
 // Global instance
@@ -84,6 +85,9 @@ void CGameNetworkManager::Terminate()
 	if( m_bInitialised )
 	{
 		s_pPlatformNetworkManager->Terminate();
+		delete s_pPlatformNetworkManager;
+		s_pPlatformNetworkManager = NULL;
+		m_bInitialised = false;
 	}
 }
 
@@ -680,6 +684,16 @@ void CGameNetworkManager::CancelJoinGame(LPVOID lpParam)
 #endif
 }
 
+bool CGameNetworkManager::IsJoinPending()
+{
+#ifdef _WINDOWS64
+	CPlatformNetworkManagerStub *stub = (CPlatformNetworkManagerStub *)s_pPlatformNetworkManager;
+	return stub->IsJoinPending();
+#else
+	return false;
+#endif
+}
+
 bool CGameNetworkManager::LeaveGame(bool bMigrateHost)
 {
 	Minecraft::GetInstance()->gui->clearMessages();
@@ -883,7 +897,11 @@ int CGameNetworkManager::ServerThreadProc( void* lpParameter )
 	IntCache::ReleaseThreadStorage();
 	Level::destroyLightingCache();
 
-	if(lpParameter != NULL) delete lpParameter;
+	if (lpParameter != NULL)
+	{
+		NetworkGameInitData *param = (NetworkGameInitData *)lpParameter;
+		delete param;
+	}
 
 	return S_OK;
 }

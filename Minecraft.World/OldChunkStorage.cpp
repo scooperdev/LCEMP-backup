@@ -455,24 +455,27 @@ LevelChunk *OldChunkStorage::load(Level *level, DataInputStream *dis)
 
 	CompoundTag *tag = NbtIo::read(dis);
 
-	loadEntities(levelChunk, level, tag);
-
-	if (tag->contains(L"TileTicks"))
+	if (tag != NULL)
 	{
-		ListTag<CompoundTag> *tileTicks = (ListTag<CompoundTag> *) tag->getList(L"TileTicks");
+		loadEntities(levelChunk, level, tag);
 
-		if (tileTicks != NULL)
+		if (tag->contains(L"TileTicks"))
 		{
-			for (int i = 0; i < tileTicks->size(); i++)
-			{
-				CompoundTag *teTag = tileTicks->get(i);
+			ListTag<CompoundTag> *tileTicks = (ListTag<CompoundTag> *) tag->getList(L"TileTicks");
 
-				level->forceAddTileTick(teTag->getInt(L"x"), teTag->getInt(L"y"), teTag->getInt(L"z"), teTag->getInt(L"i"), teTag->getInt(L"t"));
+			if (tileTicks != NULL)
+			{
+				for (int i = 0; i < tileTicks->size(); i++)
+				{
+					CompoundTag *teTag = tileTicks->get(i);
+
+					level->forceAddTileTick(teTag->getInt(L"x"), teTag->getInt(L"y"), teTag->getInt(L"z"), teTag->getInt(L"i"), teTag->getInt(L"t"));
+				}
 			}
 		}
-	}
 
-	delete tag;
+		delete tag;
+	}
 
 	return levelChunk;
 }

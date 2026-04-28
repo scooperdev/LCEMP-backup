@@ -10,12 +10,14 @@ private:
 	static const int MAX_CACHE_SIZE = 256;
 
 	unordered_map<File, RegionFile *, FileKeyHash, FileKeyEq> cache;
+	CRITICAL_SECTION m_cs;
 
 	static RegionFileCache s_defaultCache;
 
 public:
 	// Made public and non-static so we can have a cache for input and output files
-	RegionFileCache() {}
+	RegionFileCache() { InitializeCriticalSectionAndSpinCount(&m_cs, 4000); }
+	~RegionFileCache() { DeleteCriticalSection(&m_cs); }
 
     RegionFile *_getRegionFile(ConsoleSaveFile *saveFile, const wstring &prefix, int chunkX, int chunkZ);		// 4J - TODO was synchronized
     void _clear();															// 4J - TODO was synchronized

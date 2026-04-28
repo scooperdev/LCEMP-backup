@@ -152,6 +152,7 @@ void EnchantmentMenu::slotsChanged() // 4J used to take a shared_ptr<Container> 
 
 bool EnchantmentMenu::clickMenuButton(shared_ptr<Player> player, int i)
 {
+	if (i < 0 || i >= 3) return false;
 	shared_ptr<ItemInstance> item = enchantSlots->getItem(0);
 	if (costs[i] > 0 && item != NULL && (player->experienceLevel >= costs[i] || player->abilities.instabuild) )
 	{

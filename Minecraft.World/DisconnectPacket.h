@@ -50,6 +50,11 @@ public:
 #ifdef _XBOX_ONE
 		eDisconnect_ExitedGame,
 #endif
+
+		eDisconnect_NotWhitelisted = 100,
+		eDisconnect_ServerBanned,
+		eDisconnect_IPBanned,
+		eDisconnect_InvalidUsername,
 	};
 
 	// 4J Stu - The reason was a string, but we need to send a non-locale specific reason

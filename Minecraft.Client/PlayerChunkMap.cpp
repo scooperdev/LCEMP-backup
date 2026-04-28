@@ -5,11 +5,11 @@
 #include "ServerChunkCache.h"
 #include "ServerPlayer.h"
 #include "MinecraftServer.h"
-#include "..\Minecraft.World\net.minecraft.network.packet.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\Minecraft.World\ArrayWithLength.h"
-#include "..\Minecraft.World\System.h"
+#include "../Minecraft.World/net.minecraft.network.packet.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../Minecraft.World/ArrayWithLength.h"
+#include "../Minecraft.World/System.h"
 #include "PlayerList.h"
 
 PlayerChunkMap::PlayerChunk::PlayerChunk(int x, int z, PlayerChunkMap *pcm) : pos(x,z)
@@ -500,7 +500,24 @@ void PlayerChunkMap::getChunkAndRemovePlayer(int x, int z, shared_ptr<ServerPlay
 void PlayerChunkMap::tickAddRequests(shared_ptr<ServerPlayer> player)
 {
 #ifdef _WINDOWS64
-	const int maxPerTick = 10;
+	int maxPerTick = 10;
+#if defined(_DEDICATED_SERVER)
+	int activePlayers = (int)players.size();
+	if (activePlayers < 1)
+	{
+		activePlayers = 1;
+	}
+
+	maxPerTick = 48 / activePlayers;
+	if (maxPerTick < 1)
+	{
+		maxPerTick = 1;
+	}
+	if (maxPerTick > 10)
+	{
+		maxPerTick = 10;
+	}
+#endif
 #else
 	const int maxPerTick = 1;
 #endif

@@ -5,12 +5,13 @@
 #ifdef _WINDOWS64
 
 #include "WinsockNetLayer.h"
-#include "..\..\Common\Network\PlatformNetworkManagerStub.h"
-#include "..\..\..\Minecraft.World\Socket.h"
+#include "../../Common/Network/PlatformNetworkManagerStub.h"
+#include "../../../Minecraft.World/Socket.h"
 
 SOCKET WinsockNetLayer::s_listenSocket = INVALID_SOCKET;
 SOCKET WinsockNetLayer::s_hostConnectionSocket = INVALID_SOCKET;
 HANDLE WinsockNetLayer::s_acceptThread = NULL;
+HANDLE WinsockNetLayer::s_ioThread = NULL;
 HANDLE WinsockNetLayer::s_clientRecvThread = NULL;
 
 bool WinsockNetLayer::s_isHost = false;
@@ -25,7 +26,7 @@ BYTE WinsockNetLayer::s_nextSmallId = 1;
 CRITICAL_SECTION WinsockNetLayer::s_sendLock;
 CRITICAL_SECTION WinsockNetLayer::s_connectionsLock;
 
-Win64RemoteConnection WinsockNetLayer::s_connections[WIN64_NET_MAX_CLIENTS + 1];
+std::vector<Win64RemoteConnection> WinsockNetLayer::s_connections;
 
 SOCKET WinsockNetLayer::s_advertiseSock = INVALID_SOCKET;
 HANDLE WinsockNetLayer::s_advertiseThread = NULL;
@@ -35,6 +36,7 @@ CRITICAL_SECTION WinsockNetLayer::s_advertiseLock;
 int WinsockNetLayer::s_hostGamePort = WIN64_NET_DEFAULT_PORT;
 
 SOCKET WinsockNetLayer::s_discoverySock = INVALID_SOCKET;
+SOCKET WinsockNetLayer::s_discoveryLegacySock = INVALID_SOCKET;
 HANDLE WinsockNetLayer::s_discoveryThread = NULL;
 volatile bool WinsockNetLayer::s_discovering = false;
 CRITICAL_SECTION WinsockNetLayer::s_discoveryLock;
@@ -50,12 +52,36 @@ CRITICAL_SECTION WinsockNetLayer::s_freeSmallIdLock;
 std::vector<BYTE> WinsockNetLayer::s_freeSmallIds;
 
 CRITICAL_SECTION WinsockNetLayer::s_earlyDataLock;
-std::vector<BYTE> WinsockNetLayer::s_earlyDataBuffers[WIN64_NET_MAX_CLIENTS + 1];
+std::vector<std::vector<BYTE> > WinsockNetLayer::s_earlyDataBuffers;
+
+HANDLE WinsockNetLayer::s_asyncJoinThread = NULL;
+volatile WinsockNetLayer::JoinResult WinsockNetLayer::s_asyncJoinResult = WinsockNetLayer::JOIN_FAILED;
+volatile bool WinsockNetLayer::s_asyncJoinActive = false;
+char WinsockNetLayer::s_asyncJoinIP[256] = {};
+int WinsockNetLayer::s_asyncJoinPort = 0;
 
 bool g_Win64MultiplayerHost = false;
 bool g_Win64MultiplayerJoin = false;
 int g_Win64MultiplayerPort = WIN64_NET_DEFAULT_PORT;
 char g_Win64MultiplayerIP[256] = "127.0.0.1";
+
+bool g_ServerAdvertiseLAN = true;
+char g_ServerBindAddress[256] = "";
+#ifdef _DEDICATED_SERVER
+int g_ServerMaxPlayers = MINECRAFT_NET_MAX_PLAYERS;
+#else
+int g_ServerMaxPlayers = 8;
+#endif
+
+size_t WinsockNetLayer::GetConnectionSlotCount()
+{
+	int configured = g_ServerMaxPlayers;
+	if (configured < 1)
+		configured = 1;
+	if (configured > 255)
+		configured = 255;
+	return (size_t)configured;
+}
 
 bool WinsockNetLayer::Initialize()
 {
@@ -78,24 +104,41 @@ bool WinsockNetLayer::Initialize()
 	InitializeCriticalSection(&s_freeSmallIdLock);
 	InitializeCriticalSection(&s_earlyDataLock);
 
-	for (int i = 0; i < WIN64_NET_MAX_CLIENTS + 1; i++)
+	size_t slotCount = GetConnectionSlotCount();
+	s_connections.clear();
+	s_connections.resize(slotCount);
+	s_earlyDataBuffers.clear();
+	s_earlyDataBuffers.resize(slotCount);
+
+	for (size_t i = 0; i < slotCount; i++)
 	{
 		s_connections[i].tcpSocket = INVALID_SOCKET;
-		s_connections[i].smallId = 0;
-		s_connections[i].recvThread = NULL;
+		s_connections[i].smallId = (BYTE)i;
 		s_connections[i].active = false;
 		InitializeCriticalSection(&s_connections[i].sendLock);
+		s_connections[i].recvBuffer = NULL;
+		s_connections[i].recvBufferUsed = 0;
+		s_connections[i].recvBufferSize = 0;
+		s_connections[i].currentPacketSize = 0;
+		s_connections[i].readingHeader = true;
+		s_connections[i].sendBuffer = NULL;
+		s_connections[i].sendBufferUsed = 0;
+		s_connections[i].sendBufferSize = 0;
+		InitializeCriticalSection(&s_connections[i].sendBufLock);
 	}
 
 	s_initialized = true;
 
+#ifndef WITH_SERVER_CODE
 	StartDiscovery();
+#endif
 
 	return true;
 }
 
 void WinsockNetLayer::Shutdown()
 {
+	CancelJoinGame();
 	StopAdvertising();
 	StopDiscovery();
 
@@ -115,7 +158,7 @@ void WinsockNetLayer::Shutdown()
 	}
 
 	EnterCriticalSection(&s_connectionsLock);
-	for (int i = 0; i < WIN64_NET_MAX_CLIENTS + 1; i++)
+	for (size_t i = 0; i < s_connections.size(); i++)
 	{
 		s_connections[i].active = false;
 		if (s_connections[i].tcpSocket != INVALID_SOCKET)
@@ -123,15 +166,29 @@ void WinsockNetLayer::Shutdown()
 			closesocket(s_connections[i].tcpSocket);
 			s_connections[i].tcpSocket = INVALID_SOCKET;
 		}
-		if (s_connections[i].recvThread != NULL)
+		if (s_connections[i].recvBuffer != NULL)
 		{
-			WaitForSingleObject(s_connections[i].recvThread, 2000);
-			CloseHandle(s_connections[i].recvThread);
-			s_connections[i].recvThread = NULL;
+			free(s_connections[i].recvBuffer);
+			s_connections[i].recvBuffer = NULL;
 		}
+		if (s_connections[i].sendBuffer != NULL)
+		{
+			free(s_connections[i].sendBuffer);
+			s_connections[i].sendBuffer = NULL;
+		}
+		DeleteCriticalSection(&s_connections[i].sendBufLock);
 		DeleteCriticalSection(&s_connections[i].sendLock);
 	}
+	s_connections.clear();
+	s_earlyDataBuffers.clear();
 	LeaveCriticalSection(&s_connectionsLock);
+
+	if (s_ioThread != NULL)
+	{
+		WaitForSingleObject(s_ioThread, 3000);
+		CloseHandle(s_ioThread);
+		s_ioThread = NULL;
+	}
 
 	if (s_acceptThread != NULL)
 	{
@@ -189,7 +246,15 @@ bool WinsockNetLayer::HostGame(int port)
 	char portStr[16];
 	sprintf_s(portStr, "%d", port);
 
-	int iResult = getaddrinfo(NULL, portStr, &hints, &result);
+	const char *bindNode = NULL;
+	extern char g_ServerBindAddress[256];
+	if (g_ServerBindAddress[0] != '\0')
+	{
+		bindNode = g_ServerBindAddress;
+		hints.ai_flags = 0;
+	}
+
+	int iResult = getaddrinfo(bindNode, portStr, &hints, &result);
 	if (iResult != 0)
 	{
 		app.DebugPrintf("getaddrinfo failed: %d\n", iResult);
@@ -229,6 +294,7 @@ bool WinsockNetLayer::HostGame(int port)
 	s_active = true;
 	s_connected = true;
 
+	s_ioThread = CreateThread(NULL, 0, IOThreadProc, NULL, 0, NULL);
 	s_acceptThread = CreateThread(NULL, 0, AcceptThreadProc, NULL, 0, NULL);
 
 	app.DebugPrintf("Win64 LAN: Hosting on port %d\n", port);
@@ -373,6 +439,59 @@ bool WinsockNetLayer::JoinGame(const char *ip, int port)
 	return true;
 }
 
+bool WinsockNetLayer::BeginJoinGame(const char *ip, int port)
+{
+	if (s_asyncJoinActive)
+		return false;
+
+	CancelJoinGame();
+
+	strncpy_s(s_asyncJoinIP, sizeof(s_asyncJoinIP), ip, _TRUNCATE);
+	s_asyncJoinPort = port;
+	s_asyncJoinResult = JOIN_IN_PROGRESS;
+	s_asyncJoinActive = true;
+
+	s_asyncJoinThread = CreateThread(NULL, 0, AsyncJoinThreadProc, NULL, 0, NULL);
+	if (s_asyncJoinThread == NULL)
+	{
+		s_asyncJoinActive = false;
+		s_asyncJoinResult = JOIN_FAILED;
+		return false;
+	}
+
+	return true;
+}
+
+WinsockNetLayer::JoinResult WinsockNetLayer::PollJoinResult()
+{
+	return s_asyncJoinResult;
+}
+
+void WinsockNetLayer::CancelJoinGame()
+{
+	if (s_asyncJoinThread != NULL)
+	{
+		s_asyncJoinActive = false;
+		WaitForSingleObject(s_asyncJoinThread, 5000);
+		CloseHandle(s_asyncJoinThread);
+		s_asyncJoinThread = NULL;
+	}
+
+	if (s_hostConnectionSocket != INVALID_SOCKET && !s_connected)
+	{
+		closesocket(s_hostConnectionSocket);
+		s_hostConnectionSocket = INVALID_SOCKET;
+	}
+}
+
+DWORD WINAPI WinsockNetLayer::AsyncJoinThreadProc(LPVOID param)
+{
+	bool result = JoinGame(s_asyncJoinIP, s_asyncJoinPort);
+	s_asyncJoinResult = result ? JOIN_SUCCESS : JOIN_FAILED;
+	s_asyncJoinActive = false;
+	return 0;
+}
+
 bool WinsockNetLayer::SendOnSocket(SOCKET sock, const void *data, int dataSize)
 {
 	if (sock == INVALID_SOCKET || dataSize <= 0 || dataSize > WIN64_NET_MAX_PACKET_SIZE) return false;
@@ -408,23 +527,59 @@ bool WinsockNetLayer::SendOnSocket(SOCKET sock, const void *data, int dataSize)
 bool WinsockNetLayer::SendToSmallId(BYTE targetSmallId, const void *data, int dataSize)
 {
 	if (!s_active) return false;
+	if (dataSize <= 0 || dataSize > WIN64_NET_MAX_PACKET_SIZE || data == NULL) return false;
 
 	if (s_isHost)
 	{
+		if ((size_t)targetSmallId >= s_connections.size()) return false;
+
 		EnterCriticalSection(&s_connectionsLock);
-		if (targetSmallId >= WIN64_NET_MAX_CLIENTS + 1 || !s_connections[targetSmallId].active)
+		if (!s_connections[targetSmallId].active)
 		{
 			LeaveCriticalSection(&s_connectionsLock);
 			return false;
 		}
-		SOCKET sock = s_connections[targetSmallId].tcpSocket;
-		CRITICAL_SECTION *pLock = &s_connections[targetSmallId].sendLock;
 		LeaveCriticalSection(&s_connectionsLock);
 
-		EnterCriticalSection(pLock);
-		bool result = SendOnSocket(sock, data, dataSize);
-		LeaveCriticalSection(pLock);
-		return result;
+		BYTE header[4];
+		header[0] = (BYTE)((dataSize >> 24) & 0xFF);
+		header[1] = (BYTE)((dataSize >> 16) & 0xFF);
+		header[2] = (BYTE)((dataSize >> 8) & 0xFF);
+		header[3] = (BYTE)(dataSize & 0xFF);
+
+		int totalNeeded = 4 + dataSize;
+
+		EnterCriticalSection(&s_connections[targetSmallId].sendBufLock);
+
+		if (s_connections[targetSmallId].sendBufferUsed + totalNeeded > WIN64_NET_MAX_SEND_QUEUE)
+		{
+			LeaveCriticalSection(&s_connections[targetSmallId].sendBufLock);
+			app.DebugPrintf("Win64 LAN: Send queue overflow for smallId=%d, disconnecting\n", targetSmallId);
+			CloseConnectionBySmallId(targetSmallId);
+			return false;
+		}
+
+		int space = s_connections[targetSmallId].sendBufferSize - s_connections[targetSmallId].sendBufferUsed;
+		if (space < totalNeeded)
+		{
+			int newSize = s_connections[targetSmallId].sendBufferUsed + totalNeeded + 65536;
+			BYTE *newBuf = (BYTE *)realloc(s_connections[targetSmallId].sendBuffer, newSize);
+			if (newBuf == NULL)
+			{
+				LeaveCriticalSection(&s_connections[targetSmallId].sendBufLock);
+				return false;
+			}
+			s_connections[targetSmallId].sendBuffer = newBuf;
+			s_connections[targetSmallId].sendBufferSize = newSize;
+		}
+
+		memcpy(s_connections[targetSmallId].sendBuffer + s_connections[targetSmallId].sendBufferUsed, header, 4);
+		s_connections[targetSmallId].sendBufferUsed += 4;
+		memcpy(s_connections[targetSmallId].sendBuffer + s_connections[targetSmallId].sendBufferUsed, data, dataSize);
+		s_connections[targetSmallId].sendBufferUsed += dataSize;
+
+		LeaveCriticalSection(&s_connections[targetSmallId].sendBufLock);
+		return true;
 	}
 	else
 	{
@@ -438,7 +593,7 @@ bool WinsockNetLayer::SendToSmallId(BYTE targetSmallId, const void *data, int da
 SOCKET WinsockNetLayer::GetSocketForSmallId(BYTE smallId)
 {
 	EnterCriticalSection(&s_connectionsLock);
-	if (smallId < WIN64_NET_MAX_CLIENTS + 1 && s_connections[smallId].active)
+	if ((size_t)smallId < s_connections.size() && s_connections[smallId].active)
 	{
 		SOCKET sock = s_connections[smallId].tcpSocket;
 		LeaveCriticalSection(&s_connectionsLock);
@@ -446,6 +601,18 @@ SOCKET WinsockNetLayer::GetSocketForSmallId(BYTE smallId)
 	}
 	LeaveCriticalSection(&s_connectionsLock);
 	return INVALID_SOCKET;
+}
+
+std::string WinsockNetLayer::GetIPForSmallId(BYTE smallId)
+{
+	SOCKET sock = GetSocketForSmallId(smallId);
+	if (sock == INVALID_SOCKET) return "";
+	struct sockaddr_in addr;
+	int addrLen = sizeof(addr);
+	if (getpeername(sock, (struct sockaddr *)&addr, &addrLen) != 0) return "";
+	char buf[INET_ADDRSTRLEN];
+	if (inet_ntop(AF_INET, &addr.sin_addr, buf, sizeof(buf)) == NULL) return "";
+	return std::string(buf);
 }
 
 static bool RecvExact(SOCKET sock, BYTE *buf, int len)
@@ -467,7 +634,7 @@ void WinsockNetLayer::HandleDataReceived(BYTE fromSmallId, BYTE toSmallId, unsig
 
 	if (pPlayerFrom == NULL || pPlayerTo == NULL)
 	{
-		if (s_isHost && fromSmallId > 0 && fromSmallId < WIN64_NET_MAX_CLIENTS + 1)
+		if (s_isHost && fromSmallId > 0 && (size_t)fromSmallId < s_earlyDataBuffers.size())
 		{
 			EnterCriticalSection(&s_earlyDataLock);
 			s_earlyDataBuffers[fromSmallId].insert(
@@ -501,7 +668,7 @@ void WinsockNetLayer::HandleDataReceived(BYTE fromSmallId, BYTE toSmallId, unsig
 void WinsockNetLayer::FlushPendingData()
 {
 	EnterCriticalSection(&s_earlyDataLock);
-	for (int i = 1; i < WIN64_NET_MAX_CLIENTS + 1; i++)
+	for (size_t i = 1; i < s_earlyDataBuffers.size(); i++)
 	{
 		if (s_earlyDataBuffers[i].empty()) continue;
 
@@ -533,6 +700,11 @@ DWORD WINAPI WinsockNetLayer::AcceptThreadProc(LPVOID param)
 		int noDelay = 1;
 		setsockopt(clientSocket, IPPROTO_TCP, TCP_NODELAY, (const char *)&noDelay, sizeof(noDelay));
 
+		int sndbuf = 131072;
+		setsockopt(clientSocket, SOL_SOCKET, SO_SNDBUF, (const char *)&sndbuf, sizeof(sndbuf));
+		int rcvbuf = 131072;
+		setsockopt(clientSocket, SOL_SOCKET, SO_RCVBUF, (const char *)&rcvbuf, sizeof(rcvbuf));
+
 		extern QNET_STATE _iQNetStubState;
 		if (_iQNetStubState != QNET_STATE_GAME_PLAY)
 		{
@@ -548,7 +720,7 @@ DWORD WINAPI WinsockNetLayer::AcceptThreadProc(LPVOID param)
 			assignedSmallId = s_freeSmallIds.back();
 			s_freeSmallIds.pop_back();
 		}
-		else if (s_nextSmallId < MINECRAFT_NET_MAX_PLAYERS)
+		else if (s_nextSmallId < g_ServerMaxPlayers)
 		{
 			assignedSmallId = s_nextSmallId++;
 		}
@@ -561,6 +733,13 @@ DWORD WINAPI WinsockNetLayer::AcceptThreadProc(LPVOID param)
 		}
 		LeaveCriticalSection(&s_freeSmallIdLock);
 
+		if ((size_t)assignedSmallId >= s_connections.size() || assignedSmallId >= IQNet::GetPlayerCapacity())
+		{
+			app.DebugPrintf("Win64 LAN: Invalid smallId %d, rejecting\n", assignedSmallId);
+			closesocket(clientSocket);
+			continue;
+		}
+
 		BYTE assignBuf[1] = { assignedSmallId };
 		int sent = send(clientSocket, (const char *)assignBuf, 1, 0);
 		if (sent != 1)
@@ -570,18 +749,31 @@ DWORD WINAPI WinsockNetLayer::AcceptThreadProc(LPVOID param)
 			continue;
 		}
 
+		u_long nonBlocking = 1;
+		ioctlsocket(clientSocket, FIONBIO, &nonBlocking);
+
 		Win64RemoteConnection &conn = s_connections[assignedSmallId];
 
 		EnterCriticalSection(&s_connectionsLock);
-		if (conn.recvThread != NULL)
-		{
-			WaitForSingleObject(conn.recvThread, 2000);
-			CloseHandle(conn.recvThread);
-			conn.recvThread = NULL;
-		}
 		conn.tcpSocket = clientSocket;
 		conn.smallId = assignedSmallId;
 		conn.active = true;
+		conn.recvBufferUsed = 0;
+		conn.currentPacketSize = 0;
+		conn.readingHeader = true;
+		if (conn.recvBuffer == NULL)
+		{
+			conn.recvBuffer = (BYTE *)malloc(WIN64_NET_RECV_BUFFER_SIZE);
+			conn.recvBufferSize = WIN64_NET_RECV_BUFFER_SIZE;
+		}
+		EnterCriticalSection(&conn.sendBufLock);
+		conn.sendBufferUsed = 0;
+		if (conn.sendBuffer == NULL)
+		{
+			conn.sendBuffer = (BYTE *)malloc(WIN64_NET_SEND_BUFFER_SIZE);
+			conn.sendBufferSize = WIN64_NET_SEND_BUFFER_SIZE;
+		}
+		LeaveCriticalSection(&conn.sendBufLock);
 		LeaveCriticalSection(&s_connectionsLock);
 
 		app.DebugPrintf("Win64 LAN: Client connected, assigned smallId=%d\n", assignedSmallId);
@@ -591,91 +783,177 @@ DWORD WINAPI WinsockNetLayer::AcceptThreadProc(LPVOID param)
 		extern void Win64_SetupRemoteQNetPlayer(IQNetPlayer *player, BYTE smallId, bool isHost, bool isLocal);
 		Win64_SetupRemoteQNetPlayer(qnetPlayer, assignedSmallId, false, false);
 
-
 		EnterCriticalSection(&s_pendingJoinLock);
 		s_pendingJoinSmallIds.push_back(assignedSmallId);
 		LeaveCriticalSection(&s_pendingJoinLock);
-
-		DWORD *threadParam = new DWORD;
-		*threadParam = assignedSmallId;
-		HANDLE hThread = CreateThread(NULL, 0, RecvThreadProc, threadParam, 0, NULL);
-
-		EnterCriticalSection(&s_connectionsLock);
-		s_connections[assignedSmallId].recvThread = hThread;
-		LeaveCriticalSection(&s_connectionsLock);
 	}
 	return 0;
 }
 
-DWORD WINAPI WinsockNetLayer::RecvThreadProc(LPVOID param)
+bool WinsockNetLayer::ProcessRecvData(Win64RemoteConnection &conn)
 {
-	BYTE clientSmallId = (BYTE)*(DWORD *)param;
-	delete (DWORD *)param;
-
-	EnterCriticalSection(&s_connectionsLock);
-	if (clientSmallId >= WIN64_NET_MAX_CLIENTS + 1 || !s_connections[clientSmallId].active)
+	if (conn.readingHeader)
 	{
-		LeaveCriticalSection(&s_connectionsLock);
-		return 0;
-	}
-	SOCKET sock = s_connections[clientSmallId].tcpSocket;
-	LeaveCriticalSection(&s_connectionsLock);
-
-	std::vector<BYTE> recvBuf;
-	recvBuf.resize(WIN64_NET_RECV_BUFFER_SIZE);
-
-	while (s_active)
-	{
-		BYTE header[4];
-		if (!RecvExact(sock, header, 4))
-		{
-			app.DebugPrintf("Win64 LAN: Client smallId=%d disconnected (header)\n", clientSmallId);
-			break;
-		}
+		if (conn.recvBufferUsed < 4) return false;
 
 		int packetSize =
-			((uint32_t)header[0] << 24) |
-			((uint32_t)header[1] << 16) |
-			((uint32_t)header[2] << 8) |
-			((uint32_t)header[3]);
+			((uint32_t)conn.recvBuffer[0] << 24) |
+			((uint32_t)conn.recvBuffer[1] << 16) |
+			((uint32_t)conn.recvBuffer[2] << 8) |
+			((uint32_t)conn.recvBuffer[3]);
 
 		if (packetSize <= 0 || (unsigned int)packetSize > WIN64_NET_MAX_PACKET_SIZE)
 		{
-			app.DebugPrintf("Win64 LAN: Invalid packet size %d from client smallId=%d (max=%d)\n",
-				packetSize,
-				clientSmallId,
-				(int)WIN64_NET_MAX_PACKET_SIZE);
-			break;
+			app.DebugPrintf("Win64 LAN: Invalid packet size %d from smallId=%d\n", packetSize, conn.smallId);
+			conn.active = false;
+			return false;
 		}
 
-		if ((int)recvBuf.size() < packetSize)
+		conn.currentPacketSize = packetSize;
+		conn.readingHeader = false;
+
+		memmove(conn.recvBuffer, conn.recvBuffer + 4, conn.recvBufferUsed - 4);
+		conn.recvBufferUsed -= 4;
+
+		if (conn.recvBufferSize < packetSize)
 		{
-			recvBuf.resize(packetSize);
-			app.DebugPrintf("Win64 LAN: Resized host recv buffer to %d bytes for client smallId=%d\n", packetSize, clientSmallId);
+			int newSize = packetSize + 4096;
+			BYTE *newBuf = (BYTE *)realloc(conn.recvBuffer, newSize);
+			if (newBuf == NULL)
+			{
+				conn.active = false;
+				return false;
+			}
+			conn.recvBuffer = newBuf;
+			conn.recvBufferSize = newSize;
 		}
-
-		if (!RecvExact(sock, &recvBuf[0], packetSize))
-		{
-			app.DebugPrintf("Win64 LAN: Client smallId=%d disconnected (body)\n", clientSmallId);
-			break;
-		}
-
-		HandleDataReceived(clientSmallId, s_hostSmallId, &recvBuf[0], packetSize);
 	}
 
-	EnterCriticalSection(&s_connectionsLock);
-	s_connections[clientSmallId].active = false;
-	if (s_connections[clientSmallId].tcpSocket != INVALID_SOCKET)
+	if (conn.recvBufferUsed < conn.currentPacketSize) return false;
+
+	HandleDataReceived(conn.smallId, s_hostSmallId, conn.recvBuffer, conn.currentPacketSize);
+
+	int remaining = conn.recvBufferUsed - conn.currentPacketSize;
+	if (remaining > 0)
+		memmove(conn.recvBuffer, conn.recvBuffer + conn.currentPacketSize, remaining);
+	conn.recvBufferUsed = remaining;
+	conn.readingHeader = true;
+
+	return (remaining >= 4);
+}
+
+DWORD WINAPI WinsockNetLayer::IOThreadProc(LPVOID param)
+{
+	std::vector<WSAPOLLFD> pollFds;
+	std::vector<BYTE> pollSmallIds;
+
+	while (s_active)
 	{
-		closesocket(s_connections[clientSmallId].tcpSocket);
-		s_connections[clientSmallId].tcpSocket = INVALID_SOCKET;
+		pollFds.clear();
+		pollSmallIds.clear();
+
+		EnterCriticalSection(&s_connectionsLock);
+		for (size_t i = 1; i < s_connections.size(); i++)
+		{
+			if (s_connections[i].active && s_connections[i].tcpSocket != INVALID_SOCKET)
+			{
+				WSAPOLLFD pfd;
+				pfd.fd = s_connections[i].tcpSocket;
+				pfd.events = POLLIN;
+				pfd.revents = 0;
+				pollFds.push_back(pfd);
+				pollSmallIds.push_back((BYTE)i);
+			}
+		}
+		LeaveCriticalSection(&s_connectionsLock);
+
+		if (pollFds.empty())
+		{
+			Sleep(10);
+			continue;
+		}
+
+		int ret = WSAPoll(&pollFds[0], (ULONG)pollFds.size(), 50);
+		if (ret <= 0) continue;
+
+		for (size_t i = 0; i < pollFds.size(); i++)
+		{
+			BYTE smallId = pollSmallIds[i];
+			if ((size_t)smallId >= s_connections.size()) continue;
+			Win64RemoteConnection &conn = s_connections[smallId];
+
+			if (!conn.active) continue;
+
+			if (pollFds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+			{
+				conn.active = false;
+				closesocket(conn.tcpSocket);
+				conn.tcpSocket = INVALID_SOCKET;
+
+				EnterCriticalSection(&s_disconnectLock);
+				s_disconnectedSmallIds.push_back(smallId);
+				LeaveCriticalSection(&s_disconnectLock);
+				continue;
+			}
+
+			if (pollFds[i].revents & POLLIN)
+			{
+				while (conn.active)
+				{
+					int space = conn.recvBufferSize - conn.recvBufferUsed;
+					if (space <= 0)
+					{
+						int newSize = conn.recvBufferSize + 65536;
+						BYTE *newBuf = (BYTE *)realloc(conn.recvBuffer, newSize);
+						if (newBuf == NULL)
+						{
+							conn.active = false;
+							closesocket(conn.tcpSocket);
+							conn.tcpSocket = INVALID_SOCKET;
+							EnterCriticalSection(&s_disconnectLock);
+							s_disconnectedSmallIds.push_back(smallId);
+							LeaveCriticalSection(&s_disconnectLock);
+							break;
+						}
+						conn.recvBuffer = newBuf;
+						conn.recvBufferSize = newSize;
+						space = newSize - conn.recvBufferUsed;
+					}
+
+					int bytesRead = recv(conn.tcpSocket, (char *)(conn.recvBuffer + conn.recvBufferUsed), space, 0);
+					if (bytesRead > 0)
+					{
+						conn.recvBufferUsed += bytesRead;
+						while (ProcessRecvData(conn))
+							;
+					}
+					else if (bytesRead == 0)
+					{
+						conn.active = false;
+						closesocket(conn.tcpSocket);
+						conn.tcpSocket = INVALID_SOCKET;
+						EnterCriticalSection(&s_disconnectLock);
+						s_disconnectedSmallIds.push_back(smallId);
+						LeaveCriticalSection(&s_disconnectLock);
+						break;
+					}
+					else
+					{
+						int err = WSAGetLastError();
+						if (err == WSAEWOULDBLOCK)
+							break;
+						conn.active = false;
+						closesocket(conn.tcpSocket);
+						conn.tcpSocket = INVALID_SOCKET;
+						EnterCriticalSection(&s_disconnectLock);
+						s_disconnectedSmallIds.push_back(smallId);
+						LeaveCriticalSection(&s_disconnectLock);
+						break;
+					}
+				}
+			}
+		}
 	}
-	LeaveCriticalSection(&s_connectionsLock);
-
-	EnterCriticalSection(&s_disconnectLock);
-	s_disconnectedSmallIds.push_back(clientSmallId);
-	LeaveCriticalSection(&s_disconnectLock);
-
 	return 0;
 }
 
@@ -716,25 +994,74 @@ bool WinsockNetLayer::PopPendingJoinSmallId(BYTE *outSmallId)
 
 bool WinsockNetLayer::IsSmallIdConnected(BYTE smallId)
 {
-	if (smallId >= WIN64_NET_MAX_CLIENTS + 1) return false;
+	if ((size_t)smallId >= s_connections.size()) return false;
 	return s_connections[smallId].active;
 }
 
 void WinsockNetLayer::CloseConnectionBySmallId(BYTE smallId)
 {
 	EnterCriticalSection(&s_connectionsLock);
-	if (smallId < WIN64_NET_MAX_CLIENTS + 1 && s_connections[smallId].active && s_connections[smallId].tcpSocket != INVALID_SOCKET)
+	if ((size_t)smallId < s_connections.size() && s_connections[smallId].active && s_connections[smallId].tcpSocket != INVALID_SOCKET)
 	{
+		s_connections[smallId].active = false;
 		closesocket(s_connections[smallId].tcpSocket);
 		s_connections[smallId].tcpSocket = INVALID_SOCKET;
 		app.DebugPrintf("Win64 LAN: Force-closed TCP connection for smallId=%d\n", smallId);
 	}
 	LeaveCriticalSection(&s_connectionsLock);
 
+	if ((size_t)smallId < s_connections.size())
+	{
+		EnterCriticalSection(&s_connections[smallId].sendBufLock);
+		s_connections[smallId].sendBufferUsed = 0;
+		LeaveCriticalSection(&s_connections[smallId].sendBufLock);
+	}
+
 	EnterCriticalSection(&s_earlyDataLock);
-	if (smallId < WIN64_NET_MAX_CLIENTS + 1)
+	if ((size_t)smallId < s_earlyDataBuffers.size())
 		s_earlyDataBuffers[smallId].clear();
 	LeaveCriticalSection(&s_earlyDataLock);
+}
+
+void WinsockNetLayer::FlushSendBuffers()
+{
+	if (!s_isHost) return;
+
+	for (size_t i = 0; i < s_connections.size(); i++)
+	{
+		if (!s_connections[i].active) continue;
+
+		EnterCriticalSection(&s_connections[i].sendBufLock);
+		if (s_connections[i].sendBufferUsed > 0 && s_connections[i].tcpSocket != INVALID_SOCKET)
+		{
+			int totalSent = 0;
+			while (totalSent < s_connections[i].sendBufferUsed)
+			{
+				int sent = send(s_connections[i].tcpSocket,
+					(const char *)(s_connections[i].sendBuffer + totalSent),
+					s_connections[i].sendBufferUsed - totalSent, 0);
+				if (sent == SOCKET_ERROR)
+				{
+					int err = WSAGetLastError();
+					if (err == WSAEWOULDBLOCK)
+						break;
+					s_connections[i].active = false;
+					EnterCriticalSection(&s_disconnectLock);
+					s_disconnectedSmallIds.push_back((BYTE)i);
+					LeaveCriticalSection(&s_disconnectLock);
+					break;
+				}
+				if (sent == 0) break;
+				totalSent += sent;
+			}
+
+			int remaining = s_connections[i].sendBufferUsed - totalSent;
+			if (remaining > 0)
+				memmove(s_connections[i].sendBuffer, s_connections[i].sendBuffer + totalSent, remaining);
+			s_connections[i].sendBufferUsed = remaining;
+		}
+		LeaveCriticalSection(&s_connections[i].sendBufLock);
+	}
 }
 
 DWORD WINAPI WinsockNetLayer::ClientRecvThreadProc(LPVOID param)
@@ -791,7 +1118,7 @@ bool WinsockNetLayer::StartAdvertising(int gamePort, const wchar_t *hostName, un
 	s_advertiseData.gamePort = (WORD)gamePort;
 	wcsncpy_s(s_advertiseData.hostName, 32, hostName, _TRUNCATE);
 	s_advertiseData.playerCount = 1;
-	s_advertiseData.maxPlayers = MINECRAFT_NET_MAX_PLAYERS;
+	s_advertiseData.maxPlayers = g_ServerMaxPlayers;
 	s_advertiseData.gameHostSettings = gameSettings;
 	s_advertiseData.texturePackParentId = texPackId;
 	s_advertiseData.subTexturePackId = subTexId;
@@ -817,7 +1144,7 @@ bool WinsockNetLayer::StartAdvertising(int gamePort, const wchar_t *hostName, un
 	s_advertising = true;
 	s_advertiseThread = CreateThread(NULL, 0, AdvertiseThreadProc, NULL, 0, NULL);
 
-	app.DebugPrintf("Win64 LAN: Started advertising on UDP port %d\n", WIN64_LAN_DISCOVERY_PORT);
+	app.DebugPrintf("Win64 LAN: Started advertising on UDP port %d\n", gamePort);
 	return true;
 }
 
@@ -865,26 +1192,39 @@ void WinsockNetLayer::UpdateAdvertiseJoinable(bool joinable)
 	LeaveCriticalSection(&s_advertiseLock);
 }
 
+void WinsockNetLayer::UpdateAdvertiseGameHostSettings(unsigned int settings)
+{
+	EnterCriticalSection(&s_advertiseLock);
+	s_advertiseData.gameHostSettings = settings;
+	LeaveCriticalSection(&s_advertiseLock);
+}
+
 DWORD WINAPI WinsockNetLayer::AdvertiseThreadProc(LPVOID param)
 {
 	struct sockaddr_in broadcastAddr;
 	memset(&broadcastAddr, 0, sizeof(broadcastAddr));
 	broadcastAddr.sin_family = AF_INET;
-	broadcastAddr.sin_port = htons(WIN64_LAN_DISCOVERY_PORT);
 	broadcastAddr.sin_addr.s_addr = INADDR_BROADCAST;
 
 	while (s_advertising)
 	{
 		EnterCriticalSection(&s_advertiseLock);
 		Win64LANBroadcast data = s_advertiseData;
+		int gamePort = s_hostGamePort;
 		LeaveCriticalSection(&s_advertiseLock);
 
+		broadcastAddr.sin_port = htons((u_short)gamePort);
 		int sent = sendto(s_advertiseSock, (const char *)&data, sizeof(data), 0,
 			(struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr));
 
 		if (sent == SOCKET_ERROR && s_advertising)
-		{
 			app.DebugPrintf("Win64 LAN: Broadcast sendto failed: %d\n", WSAGetLastError());
+
+		if (gamePort != WIN64_LAN_DISCOVERY_PORT)
+		{
+			broadcastAddr.sin_port = htons(WIN64_LAN_DISCOVERY_PORT);
+			sendto(s_advertiseSock, (const char *)&data, sizeof(data), 0,
+				(struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr));
 		}
 
 		Sleep(1000);
@@ -911,24 +1251,47 @@ bool WinsockNetLayer::StartDiscovery()
 	struct sockaddr_in bindAddr;
 	memset(&bindAddr, 0, sizeof(bindAddr));
 	bindAddr.sin_family = AF_INET;
-	bindAddr.sin_port = htons(WIN64_LAN_DISCOVERY_PORT);
+	bindAddr.sin_port = htons(WIN64_NET_DEFAULT_PORT);
 	bindAddr.sin_addr.s_addr = INADDR_ANY;
 
 	if (::bind(s_discoverySock, (struct sockaddr *)&bindAddr, sizeof(bindAddr)) == SOCKET_ERROR)
 	{
-		app.DebugPrintf("Win64 LAN: Discovery bind failed: %d\n", WSAGetLastError());
+		app.DebugPrintf("Win64 LAN: Discovery bind to port %d failed: %d\n", WIN64_NET_DEFAULT_PORT, WSAGetLastError());
 		closesocket(s_discoverySock);
 		s_discoverySock = INVALID_SOCKET;
-		return false;
+	}
+	else
+	{
+		DWORD timeout = 500;
+		setsockopt(s_discoverySock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
 	}
 
-	DWORD timeout = 500;
-	setsockopt(s_discoverySock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
+	s_discoveryLegacySock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (s_discoveryLegacySock != INVALID_SOCKET)
+	{
+		setsockopt(s_discoveryLegacySock, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuseAddr, sizeof(reuseAddr));
+
+		bindAddr.sin_port = htons(WIN64_LAN_DISCOVERY_PORT);
+		if (::bind(s_discoveryLegacySock, (struct sockaddr *)&bindAddr, sizeof(bindAddr)) == SOCKET_ERROR)
+		{
+			app.DebugPrintf("Win64 LAN: Legacy discovery bind to port %d failed: %d\n", WIN64_LAN_DISCOVERY_PORT, WSAGetLastError());
+			closesocket(s_discoveryLegacySock);
+			s_discoveryLegacySock = INVALID_SOCKET;
+		}
+		else
+		{
+			DWORD timeout = 500;
+			setsockopt(s_discoveryLegacySock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
+		}
+	}
+
+	if (s_discoverySock == INVALID_SOCKET && s_discoveryLegacySock == INVALID_SOCKET)
+		return false;
 
 	s_discovering = true;
 	s_discoveryThread = CreateThread(NULL, 0, DiscoveryThreadProc, NULL, 0, NULL);
 
-	app.DebugPrintf("Win64 LAN: Listening for LAN games on UDP port %d\n", WIN64_LAN_DISCOVERY_PORT);
+	app.DebugPrintf("Win64 LAN: Listening for LAN games on UDP ports %d and %d\n", WIN64_NET_DEFAULT_PORT, WIN64_LAN_DISCOVERY_PORT);
 	return true;
 }
 
@@ -940,6 +1303,12 @@ void WinsockNetLayer::StopDiscovery()
 	{
 		closesocket(s_discoverySock);
 		s_discoverySock = INVALID_SOCKET;
+	}
+
+	if (s_discoveryLegacySock != INVALID_SOCKET)
+	{
+		closesocket(s_discoveryLegacySock);
+		s_discoveryLegacySock = INVALID_SOCKET;
 	}
 
 	if (s_discoveryThread != NULL)
@@ -970,98 +1339,127 @@ DWORD WINAPI WinsockNetLayer::DiscoveryThreadProc(LPVOID param)
 
 	while (s_discovering)
 	{
-		struct sockaddr_in senderAddr;
-		int senderLen = sizeof(senderAddr);
-
-		int recvLen = recvfrom(s_discoverySock, recvBuf, sizeof(recvBuf), 0,
-			(struct sockaddr *)&senderAddr, &senderLen);
-
-		if (recvLen == SOCKET_ERROR)
+		fd_set readSet;
+		FD_ZERO(&readSet);
+		int nfds = 0;
+		if (s_discoverySock != INVALID_SOCKET)
 		{
-			continue;
+			FD_SET(s_discoverySock, &readSet);
+			if ((int)s_discoverySock > nfds) nfds = (int)s_discoverySock;
+		}
+		if (s_discoveryLegacySock != INVALID_SOCKET)
+		{
+			FD_SET(s_discoveryLegacySock, &readSet);
+			if ((int)s_discoveryLegacySock > nfds) nfds = (int)s_discoveryLegacySock;
 		}
 
-		if (recvLen < (int)sizeof(Win64LANBroadcast))
+		struct timeval tv;
+		tv.tv_sec = 0;
+		tv.tv_usec = 500000;
+		int selResult = select(nfds + 1, &readSet, NULL, NULL, &tv);
+		if (selResult <= 0)
 			continue;
 
-		Win64LANBroadcast *broadcast = (Win64LANBroadcast *)recvBuf;
-		if (broadcast->magic != WIN64_LAN_BROADCAST_MAGIC)
-			continue;
+		SOCKET readySocks[2];
+		int readyCount = 0;
+		if (s_discoverySock != INVALID_SOCKET && FD_ISSET(s_discoverySock, &readSet))
+			readySocks[readyCount++] = s_discoverySock;
+		if (s_discoveryLegacySock != INVALID_SOCKET && FD_ISSET(s_discoveryLegacySock, &readSet))
+			readySocks[readyCount++] = s_discoveryLegacySock;
 
-		broadcast->hostName[31] = L'\0';
-
-		for (int pn = 0; pn < WIN64_LAN_BROADCAST_PLAYERS; pn++)
-			broadcast->playerNames[pn][XUSER_NAME_SIZE - 1] = '\0';
-
-		char senderIP[64];
-		inet_ntop(AF_INET, &senderAddr.sin_addr, senderIP, sizeof(senderIP));
-
-		DWORD now = GetTickCount();
-
-		EnterCriticalSection(&s_discoveryLock);
-
-		bool found = false;
-		for (size_t i = 0; i < s_discoveredSessions.size(); i++)
+		for (int si = 0; si < readyCount; si++)
 		{
-			if (strcmp(s_discoveredSessions[i].hostIP, senderIP) == 0 &&
-				s_discoveredSessions[i].hostPort == (int)broadcast->gamePort)
-			{
-				s_discoveredSessions[i].netVersion = broadcast->netVersion;
-				wcsncpy_s(s_discoveredSessions[i].hostName, 32, broadcast->hostName, _TRUNCATE);
-				s_discoveredSessions[i].playerCount = broadcast->playerCount;
-				s_discoveredSessions[i].maxPlayers = broadcast->maxPlayers;
-				s_discoveredSessions[i].gameHostSettings = broadcast->gameHostSettings;
-				s_discoveredSessions[i].texturePackParentId = broadcast->texturePackParentId;
-				s_discoveredSessions[i].subTexturePackId = broadcast->subTexturePackId;
-				s_discoveredSessions[i].isJoinable = (broadcast->isJoinable != 0);
-				s_discoveredSessions[i].isDedicatedServer = (broadcast->isDedicatedServer != 0);
-				s_discoveredSessions[i].lastSeenTick = now;
-				memcpy(s_discoveredSessions[i].playerNames, broadcast->playerNames, sizeof(broadcast->playerNames));
-				found = true;
-				break;
-			}
-		}
+			struct sockaddr_in senderAddr;
+			int senderLen = sizeof(senderAddr);
 
-		if (!found)
-		{
-			if (s_discoveredSessions.size() >= MAX_DISCOVERED_SESSIONS)
-			{
-				LeaveCriticalSection(&s_discoveryLock);
+			int recvLen = recvfrom(readySocks[si], recvBuf, sizeof(recvBuf), 0,
+				(struct sockaddr *)&senderAddr, &senderLen);
+
+			if (recvLen == SOCKET_ERROR)
 				continue;
-			}
 
-			Win64LANSession session;
-			memset(&session, 0, sizeof(session));
-			strncpy_s(session.hostIP, sizeof(session.hostIP), senderIP, _TRUNCATE);
-			session.hostPort = (int)broadcast->gamePort;
-			session.netVersion = broadcast->netVersion;
-			wcsncpy_s(session.hostName, 32, broadcast->hostName, _TRUNCATE);
-			session.playerCount = broadcast->playerCount;
-			session.maxPlayers = broadcast->maxPlayers;
-			session.gameHostSettings = broadcast->gameHostSettings;
-			session.texturePackParentId = broadcast->texturePackParentId;
-			session.subTexturePackId = broadcast->subTexturePackId;
-			session.isJoinable = (broadcast->isJoinable != 0);
-			session.isDedicatedServer = (broadcast->isDedicatedServer != 0);
-			session.lastSeenTick = now;
-			memcpy(session.playerNames, broadcast->playerNames, sizeof(broadcast->playerNames));
-			s_discoveredSessions.push_back(session);
+			if (recvLen < (int)sizeof(Win64LANBroadcast))
+				continue;
 
-			app.DebugPrintf("Win64 LAN: Discovered game \"%ls\" at %s:%d\n",
-				session.hostName, session.hostIP, session.hostPort);
-		}
+			Win64LANBroadcast *broadcast = (Win64LANBroadcast *)recvBuf;
+			if (broadcast->magic != WIN64_LAN_BROADCAST_MAGIC)
+				continue;
 
-		for (size_t i = s_discoveredSessions.size(); i > 0; i--)
-		{
-			if (now - s_discoveredSessions[i - 1].lastSeenTick > 5000)
+			broadcast->hostName[31] = L'\0';
+
+			for (int pn = 0; pn < WIN64_LAN_BROADCAST_PLAYERS; pn++)
+				broadcast->playerNames[pn][XUSER_NAME_SIZE - 1] = '\0';
+
+			char senderIP[64];
+			inet_ntop(AF_INET, &senderAddr.sin_addr, senderIP, sizeof(senderIP));
+
+			DWORD now = GetTickCount();
+
+			EnterCriticalSection(&s_discoveryLock);
+
+			bool found = false;
+			for (size_t i = 0; i < s_discoveredSessions.size(); i++)
 			{
-				app.DebugPrintf("Win64 LAN: Session \"%ls\" at %s timed out\n",
-					s_discoveredSessions[i - 1].hostName, s_discoveredSessions[i - 1].hostIP);
-				s_discoveredSessions.erase(s_discoveredSessions.begin() + (i - 1));
+				if (strcmp(s_discoveredSessions[i].hostIP, senderIP) == 0 &&
+					s_discoveredSessions[i].hostPort == (int)broadcast->gamePort)
+				{
+					s_discoveredSessions[i].netVersion = broadcast->netVersion;
+					wcsncpy_s(s_discoveredSessions[i].hostName, 32, broadcast->hostName, _TRUNCATE);
+					s_discoveredSessions[i].playerCount = broadcast->playerCount;
+					s_discoveredSessions[i].maxPlayers = broadcast->maxPlayers;
+					s_discoveredSessions[i].gameHostSettings = broadcast->gameHostSettings;
+					s_discoveredSessions[i].texturePackParentId = broadcast->texturePackParentId;
+					s_discoveredSessions[i].subTexturePackId = broadcast->subTexturePackId;
+					s_discoveredSessions[i].isJoinable = (broadcast->isJoinable != 0);
+					s_discoveredSessions[i].isDedicatedServer = (broadcast->isDedicatedServer != 0);
+					s_discoveredSessions[i].lastSeenTick = now;
+					memcpy(s_discoveredSessions[i].playerNames, broadcast->playerNames, sizeof(broadcast->playerNames));
+					found = true;
+					break;
+				}
 			}
-		}
 
-		LeaveCriticalSection(&s_discoveryLock);
+			if (!found)
+			{
+				if (s_discoveredSessions.size() >= MAX_DISCOVERED_SESSIONS)
+				{
+					LeaveCriticalSection(&s_discoveryLock);
+					continue;
+				}
+
+				Win64LANSession session;
+				memset(&session, 0, sizeof(session));
+				strncpy_s(session.hostIP, sizeof(session.hostIP), senderIP, _TRUNCATE);
+				session.hostPort = (int)broadcast->gamePort;
+				session.netVersion = broadcast->netVersion;
+				wcsncpy_s(session.hostName, 32, broadcast->hostName, _TRUNCATE);
+				session.playerCount = broadcast->playerCount;
+				session.maxPlayers = broadcast->maxPlayers;
+				session.gameHostSettings = broadcast->gameHostSettings;
+				session.texturePackParentId = broadcast->texturePackParentId;
+				session.subTexturePackId = broadcast->subTexturePackId;
+				session.isJoinable = (broadcast->isJoinable != 0);
+				session.isDedicatedServer = (broadcast->isDedicatedServer != 0);
+				session.lastSeenTick = now;
+				memcpy(session.playerNames, broadcast->playerNames, sizeof(broadcast->playerNames));
+				s_discoveredSessions.push_back(session);
+
+				app.DebugPrintf("Win64 LAN: Discovered game \"%ls\" at %s:%d\n",
+					session.hostName, session.hostIP, session.hostPort);
+			}
+
+			for (size_t i = s_discoveredSessions.size(); i > 0; i--)
+			{
+				if (now - s_discoveredSessions[i - 1].lastSeenTick > 5000)
+				{
+					app.DebugPrintf("Win64 LAN: Session \"%ls\" at %s timed out\n",
+						s_discoveredSessions[i - 1].hostName, s_discoveredSessions[i - 1].hostIP);
+					s_discoveredSessions.erase(s_discoveredSessions.begin() + (i - 1));
+				}
+			}
+
+			LeaveCriticalSection(&s_discoveryLock);
+		}
 	}
 
 	return 0;

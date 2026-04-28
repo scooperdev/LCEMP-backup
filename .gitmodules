@@ -1,0 +1,3 @@
+[submodule "Minecraft.Server"]
+	path = Minecraft.Server
+	url = https://github.com/LCEMP/LCEMP-Server.git

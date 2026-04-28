@@ -1,26 +1,26 @@
 #include "stdafx.h"
 #include "UI.h"
 #include "UIScene_CreateWorldMenu.h"
-#include "..\..\MinecraftServer.h"
-#include "..\..\Minecraft.h"
-#include "..\..\Options.h"
-#include "..\..\TexturePackRepository.h"
-#include "..\..\TexturePack.h"
-#include "..\..\..\Minecraft.World\LevelSettings.h"
-#include "..\..\..\Minecraft.World\StringHelpers.h"
-#include "..\..\..\Minecraft.World\BiomeSource.h"
-#include "..\..\..\Minecraft.World\IntCache.h"
-#include "..\..\..\Minecraft.World\LevelType.h"
-#include "..\..\DLCTexturePack.h"
+#include "../../MinecraftServer.h"
+#include "../../Minecraft.h"
+#include "../../Options.h"
+#include "../../TexturePackRepository.h"
+#include "../../TexturePack.h"
+#include "../../../Minecraft.World/LevelSettings.h"
+#include "../../../Minecraft.World/StringHelpers.h"
+#include "../../../Minecraft.World/BiomeSource.h"
+#include "../../../Minecraft.World/IntCache.h"
+#include "../../../Minecraft.World/LevelType.h"
+#include "../../DLCTexturePack.h"
 
 #ifdef __PSVITA__
-#include "PSVita\Network\SQRNetworkManager_AdHoc_Vita.h"
+#include "PSVita/Network/SQRNetworkManager_AdHoc_Vita.h"
 #endif
 
 #ifdef  _WINDOWS64
 
 #include <windows.h>
-#include "Xbox\Resource.h"
+#include "Xbox/Resource.h"
 #endif
 
 #define GAME_CREATE_ONLINE_TIMER_ID 0
@@ -420,13 +420,19 @@ void UIScene_CreateWorldMenu::handlePress(F64 controlId, F64 childId)
 	case eControl_EditWorldName:
 		{
 			m_bIgnoreInput=true;
+	#ifdef _WINDOWS64
+			Win64InGameKeyboard::Request(app.GetString(IDS_CREATE_NEW_WORLD), m_editWorldName.getLabel(), (DWORD)0, 25, &UIScene_CreateWorldMenu::KeyboardCompleteWorldNameCallback, this, C_4JInput::EKeyboardMode_Default);
+	#else
 			InputManager.RequestKeyboard(app.GetString(IDS_CREATE_NEW_WORLD),m_editWorldName.getLabel(),(DWORD)0,25,&UIScene_CreateWorldMenu::KeyboardCompleteWorldNameCallback,this,C_4JInput::EKeyboardMode_Default);
+	#endif
 		}
 		break;
 	case eControl_EditSeed:
 		{
 			m_bIgnoreInput=true;
-#ifdef __PS3__
+#ifdef _WINDOWS64
+			Win64InGameKeyboard::Request(app.GetString(IDS_CREATE_NEW_WORLD_SEED), m_editSeed.getLabel(), (DWORD)0, 60, &UIScene_CreateWorldMenu::KeyboardCompleteSeedCallback, this, C_4JInput::EKeyboardMode_Default);
+#elif defined(__PS3__)
 			int language = XGetLanguage();
 			switch(language)
 			{
@@ -761,7 +767,11 @@ int UIScene_CreateWorldMenu::KeyboardCompleteWorldNameCallback(LPVOID lpParam,bo
 	{
 		uint16_t pchText[128];
 		ZeroMemory(pchText, 128 * sizeof(uint16_t) );
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::GetText(pchText);
+	#else
 		InputManager.GetText(pchText);
+	#endif
 
 		if(pchText[0]!=0)
 		{
@@ -789,7 +799,11 @@ int UIScene_CreateWorldMenu::KeyboardCompleteSeedCallback(LPVOID lpParam,bool bR
 		uint16_t pchText[128];
 		ZeroMemory(pchText, 128 * sizeof(uint16_t) );
 #endif
+	#ifdef _WINDOWS64
+		Win64InGameKeyboard::GetText(pchText);
+	#else
 		InputManager.GetText(pchText);
+	#endif
 		pClass->m_editSeed.setLabel((wchar_t *)pchText);
 		pClass->m_MoreOptionsParams.seed = (wchar_t *)pchText;
 	}
@@ -1095,6 +1109,7 @@ void UIScene_CreateWorldMenu::CreateGame(UIScene_CreateWorldMenu* pClass, DWORD 
 	StorageManager.ResetSaveData();
 	// Make our next save default to the name of the level
 	StorageManager.SetSaveTitle((wchar_t *)wWorldName.c_str());
+	MinecraftServer::SetDeleteOnNoSaveForCurrentSession(true);
 
 	wstring wSeed;
 	if(!pClass->m_MoreOptionsParams.seed.empty() )

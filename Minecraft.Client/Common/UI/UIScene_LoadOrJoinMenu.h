@@ -105,6 +105,13 @@ private:
 	bool m_bSaveTransferCancelled;
 #endif
 	bool m_bUpdateSaveSize;
+#ifdef _WINDOWS64
+	wchar_t m_pendingServerName[64];
+	bool m_bAddServerFlowActive;
+	bool m_bPendingAddServerAddressKeyboard;
+	bool m_bPendingAddServerAddressShowInvalid;
+	wchar_t m_pendingServerAddressInput[128];
+#endif
 
 public:
 	UIScene_LoadOrJoinMenu(int iPad, void *initData, UILayer *parentLayer);
@@ -169,6 +176,16 @@ public:
 
 private:
 	void CheckAndJoinGame(int gameIndex);
+#ifdef _WINDOWS64
+	void BeginAddServerFlow();
+	void QueueAddServerAddressKeyboard(const wchar_t *initialText, bool showInvalidMessage = false);
+	bool IsAddServerListIndex(int listIndex);
+	bool TryGetSavedServerAtListIndex(int listIndex, char *pHost, int hostSize, unsigned short *pPort);
+	bool CanRemoveSavedServerAtListIndex(int listIndex);
+	bool RemoveSavedServerAtListIndex(int listIndex);
+	static int AddServerNameKeyboardCallback(LPVOID lpParam, bool bRes);
+	static int AddServerAddressKeyboardCallback(LPVOID lpParam, bool bRes);
+#endif
 #if defined(__PS3__) || defined(__PSVITA__) || defined(__ORBIS__)
 	static int MustSignInReturnedPSN(void *pParam,int iPad,C4JStorage::EMessageResult result);
 	static int PSN_SignInReturned(void *pParam,bool bContinue, int iPad);

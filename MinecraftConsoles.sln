@@ -8,6 +8,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Minecraft.Client", "Minecra
 		{F046C3CE-9749-4823-B32B-D9CC10B1A2C8} = {F046C3CE-9749-4823-B32B-D9CC10B1A2C8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Minecraft.Server", "Minecraft.Server\Minecraft.Server.vcxproj", "{12A22166-696D-402E-A1B8-806F46567BF2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F046C3CE-9749-4823-B32B-D9CC10B1A2C8} = {F046C3CE-9749-4823-B32B-D9CC10B1A2C8}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		ContentPackage_NO_TU|Durango = ContentPackage_NO_TU|Durango
@@ -130,6 +135,44 @@ Global
 		{1B9A8C38-DD48-448C-AA24-E1A35E0089A3}.ReleaseForArt|PSVita.ActiveCfg = ReleaseForArt|x64
 		{1B9A8C38-DD48-448C-AA24-E1A35E0089A3}.ReleaseForArt|Windows64.ActiveCfg = ReleaseForArt|x64
 		{1B9A8C38-DD48-448C-AA24-E1A35E0089A3}.ReleaseForArt|Xbox 360.ActiveCfg = ReleaseForArt|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage_NO_TU|Durango.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage_NO_TU|ORBIS.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage_NO_TU|PS3.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage_NO_TU|PSVita.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage_NO_TU|Windows64.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage_NO_TU|Xbox 360.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.CONTENTPACKAGE_SYMBOLS|Durango.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.CONTENTPACKAGE_SYMBOLS|ORBIS.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.CONTENTPACKAGE_SYMBOLS|PS3.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.CONTENTPACKAGE_SYMBOLS|PSVita.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.CONTENTPACKAGE_SYMBOLS|Windows64.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.CONTENTPACKAGE_SYMBOLS|Xbox 360.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage|Durango.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage|ORBIS.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage|PS3.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage|PSVita.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage|Windows64.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ContentPackage|Xbox 360.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Debug|Durango.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Debug|ORBIS.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Debug|PS3.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Debug|PSVita.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Debug|Windows64.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Debug|Windows64.Build.0 = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Debug|Xbox 360.ActiveCfg = Debug|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Release|Durango.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Release|ORBIS.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Release|PS3.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Release|PSVita.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Release|Windows64.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Release|Windows64.Build.0 = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.Release|Xbox 360.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ReleaseForArt|Durango.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ReleaseForArt|ORBIS.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ReleaseForArt|PS3.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ReleaseForArt|PSVita.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ReleaseForArt|Windows64.ActiveCfg = Release|x64
+		{12A22166-696D-402E-A1B8-806F46567BF2}.ReleaseForArt|Xbox 360.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,5 +1,5 @@
 #pragma once
-#ifdef _DEBUG_MENUS_ENABLED
+#if defined(_DEBUG_MENUS_ENABLED) && !defined(_CONTENT_PACKAGE)
 #include "UIScene.h"
 
 class UIScene_DebugSetCamera : public UIScene

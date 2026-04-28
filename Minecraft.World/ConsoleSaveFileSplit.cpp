@@ -5,13 +5,13 @@
 #include "File.h"
 #include <xuiapp.h>
 #include "compression.h"
-#include "..\Minecraft.Client\Minecraft.h"
-#include "..\Minecraft.Client\MinecraftServer.h"
-#include "..\Minecraft.Client\ServerLevel.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\LevelData.h"
-#include "..\Minecraft.Client\Common\GameRules\LevelGenerationOptions.h"
-#include "..\Minecraft.World\net.minecraft.world.level.chunk.storage.h"
+#include "../Minecraft.Client/Minecraft.h"
+#include "../Minecraft.Client/MinecraftServer.h"
+#include "../Minecraft.Client/ServerLevel.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/LevelData.h"
+#include "../Minecraft.Client/Common/GameRules/LevelGenerationOptions.h"
+#include "../Minecraft.World/net.minecraft.world.level.chunk.storage.h"
 
 #define RESERVE_ALLOCATION  MEM_RESERVE
 #define COMMIT_ALLOCATION  MEM_COMMIT
@@ -1347,6 +1347,8 @@ void ConsoleSaveFileSplit::Flush(bool autosave, bool updateThumbnail)
 	// We add 4 bytes to the start so that we can signal compressed data
 	// And another 4 bytes to store the decompressed data size
 	unsigned int compLength = fileSize+8;
+
+
 
 	// 4J Stu - Added TU-1 interim
 

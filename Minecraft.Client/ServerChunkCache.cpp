@@ -2,15 +2,15 @@
 #include "ServerChunkCache.h"
 #include "ServerLevel.h"
 #include "MinecraftServer.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\net.minecraft.world.level.storage.h"
-#include "..\Minecraft.World\net.minecraft.world.level.chunk.h"
-#include "..\Minecraft.World\Pos.h"
-#include "..\Minecraft.World\ProgressListener.h"
-#include "..\Minecraft.World\ThreadName.h"
-#include "..\Minecraft.World\compression.h"
-#include "..\Minecraft.World\OldChunkStorage.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/net.minecraft.world.level.storage.h"
+#include "../Minecraft.World/net.minecraft.world.level.chunk.h"
+#include "../Minecraft.World/Pos.h"
+#include "../Minecraft.World/ProgressListener.h"
+#include "../Minecraft.World/ThreadName.h"
+#include "../Minecraft.World/compression.h"
+#include "../Minecraft.World/OldChunkStorage.h"
 
 ServerChunkCache::ServerChunkCache(ServerLevel *level, ChunkStorage *storage, ChunkSource *source)
 {
@@ -149,8 +149,10 @@ LevelChunk *ServerChunkCache::create(int x, int z, bool asyncPostProcess)	// 4J 
 
 	if( ( chunk == NULL ) || ( chunk->x != x ) || ( chunk->z != z ) )
 	{
+		bool wasLoaded = false;
 		EnterCriticalSection(&m_csLoadCreate);
         chunk = load(x, z);
+		wasLoaded = (chunk != NULL);
         if (chunk == NULL)
 		{
             if (source == NULL)
@@ -470,7 +472,7 @@ void ServerChunkCache::postProcess(ChunkSource *parent, int x, int z )
 {
     LevelChunk *chunk = getChunk(x, z);
     if ( (chunk->terrainPopulated & LevelChunk::sTerrainPopulatedFromHere) == 0 )
-	{	
+	{
 		if (source != NULL)
 		{
 			PIXBeginNamedEvent(0,"Main post processing");
@@ -478,7 +480,7 @@ void ServerChunkCache::postProcess(ChunkSource *parent, int x, int z )
 			PIXEndNamedEvent();
 
             chunk->markUnsaved();
-        }
+		}
 
 		// Flag not only this chunk as being post-processed, but also all the chunks that this post-processing might affect. We can guarantee that these
 		// chunks exist as that's determined before post-processing can even run
@@ -846,6 +848,7 @@ bool ServerChunkCache::save(bool force, ProgressListener *progressListener)
 			LeaveCriticalSection(&m_csLoadCreate);
 			return true;
 		}
+		storage->WaitForAll();
         storage->flush();
     }
 

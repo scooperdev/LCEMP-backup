@@ -11,7 +11,14 @@ typedef struct tagTHREADNAME_INFO {
 
 void SetThreadName( DWORD dwThreadID, LPCSTR szThreadName )
 {
-#ifndef __PS3__
+#ifdef __linux__
+    if (dwThreadID == (DWORD)-1 || dwThreadID == (DWORD)pthread_self()) {
+        char name[16];
+        strncpy(name, szThreadName, 15);
+        name[15] = '\0';
+        pthread_setname_np(pthread_self(), name);
+    }
+#elif !defined(__PS3__)
     THREADNAME_INFO info;
 	
     info.dwType = 0x1000;
@@ -37,5 +44,5 @@ void SetThreadName( DWORD dwThreadID, LPCSTR szThreadName )
     {
     }
 #endif
-#endif // __PS3__
+#endif
 }

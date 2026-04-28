@@ -11,23 +11,27 @@
 #include "PendingConnection.h"
 #include "PlayerConnection.h"
 #include "EntityTracker.h"
-#include "..\Minecraft.World\net.minecraft.world.level.storage.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\ArrayWithLength.h"
-#include "..\Minecraft.World\net.minecraft.network.packet.h"
-#include "..\Minecraft.World\net.minecraft.network.h"
-#include "..\Minecraft.World\Pos.h"
-#include "..\Minecraft.World\ProgressListener.h"
-#include "..\Minecraft.World\HellRandomLevelSource.h"
-#include "..\Minecraft.World\net.minecraft.world.phys.h"
-#include "..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\Minecraft.World\net.minecraft.world.level.storage.h"
-#include "..\Minecraft.World\net.minecraft.world.level.saveddata.h"
-#include "..\Minecraft.World\JavaMath.h"
+#include "../Minecraft.World/net.minecraft.world.level.storage.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/ArrayWithLength.h"
+#include "../Minecraft.World/net.minecraft.network.packet.h"
+#include "../Minecraft.World/net.minecraft.network.h"
+#include "../Minecraft.World/Pos.h"
+#include "../Minecraft.World/ProgressListener.h"
+#include "../Minecraft.World/HellRandomLevelSource.h"
+#include "../Minecraft.World/net.minecraft.world.phys.h"
+#include "../Minecraft.World/net.minecraft.world.item.h"
+#include "../Minecraft.World/net.minecraft.world.level.storage.h"
+#include "../Minecraft.World/net.minecraft.world.level.saveddata.h"
+#include "../Minecraft.World/JavaMath.h"
 #if defined(_XBOX) || defined(_WINDOWS64)
-#include "Xbox\Network\NetworkPlayerXbox.h"
+#include "Xbox/Network/NetworkPlayerXbox.h"
 #elif defined(__PS3__) || defined(__ORBIS__)
-#include "Common\Network\Sony\NetworkPlayerSony.h"
+#include "Common/Network/Sony/NetworkPlayerSony.h"
+#endif
+#ifdef _DEDICATED_SERVER
+#include "../Minecraft.Server/Core/ServerLists.h"
+#include "../Minecraft.Server/Commands/ServerTextList.h"
 #endif
 
 // 4J - this class is fairly substantially altered as there didn't seem any point in porting code for banning, whitelisting, ops etc.
@@ -52,7 +56,10 @@ PlayerList::PlayerList(MinecraftServer *server)
 
     //int viewDistance = server->settings->getInt(L"view-distance", 10);
 
-#ifdef _WINDOWS64
+#ifdef _DEDICATED_SERVER
+    extern int g_ServerMaxPlayers;
+    maxPlayers = g_ServerMaxPlayers;
+#elif defined(_WINDOWS64)
     maxPlayers = MINECRAFT_NET_MAX_PLAYERS;
 #else
     maxPlayers = server->settings->getInt(L"max-players", 20);
@@ -89,6 +96,12 @@ void PlayerList::placeNewPlayer(Connection *connection, shared_ptr<ServerPlayer>
 			player->enableAllPlayerPrivileges(true);			
 			player->setPlayerGamePrivilege(Player::ePlayerGamePrivilege_HOST,1);
 		}
+#ifdef _DEDICATED_SERVER
+		if(ServerLists_IsPlayerOp(player->name))
+		{
+			player->setPlayerGamePrivilege(Player::ePlayerGamePrivilege_Op, 1);
+		}
+#endif
 
 #if defined(__PS3__) || defined(__ORBIS__)
 		// PS3 networking library doesn't automatically assign PlayerUIDs to the network players for anything remote, so need to tell it what to set from the data in this packet now
@@ -120,13 +133,16 @@ void PlayerList::placeNewPlayer(Connection *connection, shared_ptr<ServerPlayer>
 
 		DWORD playerIndex = 0;
 		{
-			bool usedIndexes[MINECRAFT_NET_MAX_PLAYERS];
-			ZeroMemory( &usedIndexes, MINECRAFT_NET_MAX_PLAYERS * sizeof(bool) );
+			vector<char> usedIndexes(maxPlayers, 0);
 			for(AUTO_VAR(it, players.begin()); it < players.end(); ++it)
 			{
-				usedIndexes[ (int)(*it)->getPlayerIndex() ] = true;
+				int existingIndex = (int)(*it)->getPlayerIndex();
+				if (existingIndex >= 0 && existingIndex < (int)usedIndexes.size())
+				{
+					usedIndexes[existingIndex] = 1;
+				}
 			}
-			for(unsigned int i = 0; i < MINECRAFT_NET_MAX_PLAYERS; ++i)
+			for(unsigned int i = 0; i < (unsigned int)maxPlayers; ++i)
 			{
 				if(!usedIndexes[i])
 				{
@@ -230,10 +246,22 @@ void PlayerList::placeNewPlayer(Connection *connection, shared_ptr<ServerPlayer>
 		playerConnection->send( shared_ptr<PlayerAbilitiesPacket>( new PlayerAbilitiesPacket(&player->abilities)) );
 		delete spawnPos;
 
+#ifdef _DEDICATED_SERVER
+		{
+			extern bool g_voiceChatEnabled;
+			if (g_voiceChatEnabled)
+			{
+				byteArray vcData(1);
+				vcData.data[0] = 1;
+				playerConnection->send(shared_ptr<CustomPayloadPacket>(new CustomPayloadPacket(L"MC|VoiceCfg", vcData)));
+			}
+		}
+#endif
+
         sendLevelInfo(player, level);
 
         // 4J-PB - removed, since it needs to be localised in the language the client is in
-		//server->players->broadcastAll( shared_ptr<ChatPacket>( new ChatPacket(L"�e" + playerEntity->name + L" joined the game.") ) );
+		//server->players->broadcastAll( shared_ptr<ChatPacket>( new ChatPacket(L"ï¿½e" + playerEntity->name + L" joined the game.") ) );
 		broadcastAll( shared_ptr<ChatPacket>( new ChatPacket(player->name, ChatPacket::e_ChatPlayerJoinedGame) ) );
 
 #ifdef WITH_SERVER_CODE
@@ -397,7 +425,7 @@ void PlayerList::add(shared_ptr<ServerPlayer> player)
 	// Some code from here has been moved to the above validatePlayerSpawnPosition function
 
 	// 4J Stu - Swapped these lines about so that we get the chunk visiblity packet way ahead of all the add tracked entity packets
-	// Fix for #9169 - ART : Sign text is replaced with the words �Awaiting approval�.
+	// Fix for #9169 - ART : Sign text is replaced with the words ï¿½Awaiting approvalï¿½.
     changeDimension(player, NULL);
     level->addEntity(player);
 
@@ -459,19 +487,11 @@ void PlayerList::remove(shared_ptr<ServerPlayer> player)
 
 shared_ptr<ServerPlayer> PlayerList::getPlayerForLogin(PendingConnection *pendingConnection, const wstring& userName, PlayerUID xuid, PlayerUID onlineXuid)
 {
-#ifdef _WINDOWS64
-    if (players.size() >= (unsigned int)MINECRAFT_NET_MAX_PLAYERS)
+    if (players.size() >= (unsigned int)maxPlayers)
     {
         pendingConnection->disconnect(DisconnectPacket::eDisconnect_ServerFull);
         return shared_ptr<ServerPlayer>();
     }
-#else
-    if (players.size() >= maxPlayers)
-	{
-        pendingConnection->disconnect(DisconnectPacket::eDisconnect_ServerFull);
-        return shared_ptr<ServerPlayer>();
-    }
-#endif
 	
 	shared_ptr<ServerPlayer> player = shared_ptr<ServerPlayer>(new ServerPlayer(server, server->getLevel(0), userName, new ServerPlayerGameMode(server->getLevel(0)) ));
 	player->gameMode->player = player; // 4J added as had to remove this assignment from ServerPlayer ctor
@@ -1011,12 +1031,20 @@ wstring PlayerList::getPlayerNames()
 
 bool PlayerList::isWhiteListed(const wstring& name)
 {
+#ifdef _DEDICATED_SERVER
+	return ServerLists_IsPlayerWhitelisted(name);
+#else
 	return true;
+#endif
 }
 
 bool PlayerList::isOp(const wstring& name)
 {
+#ifdef _DEDICATED_SERVER
+	return ServerLists_IsPlayerOp(name);
+#else
 	return false;
+#endif
 }
 
 bool PlayerList::isOp(shared_ptr<ServerPlayer> player)
@@ -1185,14 +1213,38 @@ void PlayerList::saveAll(ProgressListener *progressListener, bool bDeleteGuestMa
 
 void PlayerList::whiteList(const wstring& playerName)
 {
+#ifdef _DEDICATED_SERVER
+	ServerTextList* wl = ServerLists_GetWhitelist();
+	if (wl)
+	{
+		std::wstring lower = playerName;
+		for (size_t i = 0; i < lower.size(); i++)
+			lower[i] = towlower(lower[i]);
+		wl->add(lower);
+	}
+#endif
 }
 
 void PlayerList::blackList(const wstring& playerName)
 {
+#ifdef _DEDICATED_SERVER
+	ServerTextList* wl = ServerLists_GetWhitelist();
+	if (wl)
+	{
+		std::wstring lower = playerName;
+		for (size_t i = 0; i < lower.size(); i++)
+			lower[i] = towlower(lower[i]);
+		wl->remove(lower);
+	}
+#endif
 }
 
 void PlayerList::reloadWhitelist()
 {
+#ifdef _DEDICATED_SERVER
+	ServerTextList* wl = ServerLists_GetWhitelist();
+	if (wl) wl->load();
+#endif
 }
 
 void PlayerList::sendLevelInfo(shared_ptr<ServerPlayer> player, ServerLevel *level)

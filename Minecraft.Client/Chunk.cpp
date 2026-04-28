@@ -2,16 +2,16 @@
 #include "Chunk.h"
 #include "TileRenderer.h"
 #include "TileEntityRenderDispatcher.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.world.level.chunk.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.entity.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.world.level.chunk.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.entity.h"
 #include "LevelRenderer.h"
 
 #ifdef __PS3__
-#include "PS3\SPU_Tasks\ChunkUpdate\ChunkRebuildData.h"
-#include "PS3\SPU_Tasks\ChunkUpdate\TileRenderer_SPU.h"
-#include "PS3\SPU_Tasks\CompressedTile\CompressedTileStorage_SPU.h"
+#include "PS3/SPU_Tasks/ChunkUpdate/ChunkRebuildData.h"
+#include "PS3/SPU_Tasks/ChunkUpdate/TileRenderer_SPU.h"
+#include "PS3/SPU_Tasks/CompressedTile/CompressedTileStorage_SPU.h"
 
 #include "C4JThread_SPU.h"
 #include "C4JSpursJob.h"
@@ -169,7 +169,7 @@ void Chunk::makeCopyForRebuild(Chunk *source)
 	this->xm = source->xm;
 	this->ym = source->ym;
 	this->zm = source->zm;
-	this->bb = source->bb;
+	this->bb = NULL;
 	this->clipChunk = NULL;
 	this->id = source->id;
 	this->globalRenderableTileEntities = source->globalRenderableTileEntities;

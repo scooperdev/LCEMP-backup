@@ -1,7 +1,7 @@
 #pragma once
 using namespace std;
 #include <vector>
-#include "..\..\..\Minecraft.World\C4JThread.h"
+#include "../../../Minecraft.World/C4JThread.h"
 #include "NetworkPlayerInterface.h"
 #include "PlatformNetworkManagerInterface.h"
 #include "SessionInfo.h"
@@ -49,6 +49,8 @@ public:
 	virtual bool IsLeavingGame() { return m_bLeavingGame; }
 	virtual void ResetLeavingGame() { m_bLeavingGame = false; }
 
+	bool IsJoinPending() { return m_asyncJoinPending; }
+
 	virtual void RegisterPlayerChangedCallback(int iPad, void (*callback)(void *callbackParam, INetworkPlayer *pPlayer, bool leaving), void *callbackParam);
 	virtual void UnRegisterPlayerChangedCallback(int iPad, void (*callback)(void *callbackParam, INetworkPlayer *pPlayer, bool leaving), void *callbackParam);
 
@@ -76,6 +78,12 @@ private:
 	bool			m_bIsOfflineGame;
 	bool			m_bIsPrivateGame;
 	int				m_flagIndexSize;
+
+	bool			m_asyncJoinPending;
+	char			m_asyncJoinIP[64];
+	int				m_asyncJoinPort;
+	wchar_t			m_asyncJoinHostName[32];
+	bool			m_asyncJoinIsDedicated;
 
 	// This is only maintained by the host, and is not valid on client machines
 	GameSessionData m_hostGameSessionData;

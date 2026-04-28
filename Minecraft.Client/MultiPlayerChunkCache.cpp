@@ -1,14 +1,14 @@
 #include "stdafx.h"
 #include "MultiPlayerChunkCache.h"
 #include "ServerChunkCache.h"
-#include "..\Minecraft.World\net.minecraft.world.level.chunk.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\Arrays.h"
-#include "..\Minecraft.World\StringHelpers.h"
+#include "../Minecraft.World/net.minecraft.world.level.chunk.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/Arrays.h"
+#include "../Minecraft.World/StringHelpers.h"
 #include "MinecraftServer.h"
 #include "ServerLevel.h"
-#include "..\Minecraft.World\Tile.h"
-#include "..\Minecraft.World\WaterLevelChunk.h"
+#include "../Minecraft.World/Tile.h"
+#include "../Minecraft.World/WaterLevelChunk.h"
 
 MultiPlayerChunkCache::MultiPlayerChunkCache(Level *level)
 {
@@ -174,11 +174,12 @@ LevelChunk *MultiPlayerChunkCache::create(int x, int z)
 			// 4J-JEV: We are about to use shared data, abort if the server is stopped and the data is deleted.
 			if (MinecraftServer::getInstance()->serverHalted()) return NULL;
 
-			// If we're the host, then don't create the chunk, share data from the server's copy 
+			// If we're the host, then don't create the chunk, share data from the server's copy
+			int dimId = level->dimension->id;
 #ifdef _LARGE_WORLDS
-			LevelChunk *serverChunk = MinecraftServer::getInstance()->getLevel(level->dimension->id)->cache->getChunkLoadedOrUnloaded(x,z);
+			LevelChunk *serverChunk = MinecraftServer::getInstance()->getLevel(dimId)->cache->getChunkLoadedOrUnloaded(x,z);
 #else
-			LevelChunk *serverChunk = MinecraftServer::getInstance()->getLevel(level->dimension->id)->cache->getChunk(x,z);
+			LevelChunk *serverChunk = MinecraftServer::getInstance()->getLevel(dimId)->cache->getChunk(x,z);
 #endif
 			chunk = new LevelChunk(level, x, z, serverChunk);
 			// Let renderer know that this chunk has been created - it might have made render data from the EmptyChunk if it got to a chunk before the server sent it

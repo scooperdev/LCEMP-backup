@@ -14,7 +14,7 @@
 #include "Level.h"
 #include "ChunkPos.h"
 #include "TilePos.h"
-#include "..\Minecraft.Client\ServerLevel.h"
+#include "../Minecraft.Client/ServerLevel.h"
 #include "MobSpawner.h"
 #include "Dimension.h"
 
@@ -32,12 +32,7 @@ TilePos MobSpawner::getRandomPosWithin(Level *level, int cx, int cz)
 	return TilePos(x, y, z);
 }
 
-#ifdef __PSVITA__
-	// AP - See CustomMap.h for an explanation of this
-	CustomMap MobSpawner::chunksToPoll;
-#else
-	unordered_map<ChunkPos,bool,ChunkPosKeyHash,ChunkPosKeyEq> MobSpawner::chunksToPoll;
-#endif
+
 
 const int MobSpawner::tick(ServerLevel *level, bool spawnEnemies, bool spawnFriendlies)
 {
@@ -99,7 +94,11 @@ const int MobSpawner::tick(ServerLevel *level, bool spawnEnemies, bool spawnFrie
 		return 0;
 	}
 	MemSect(20);
-	chunksToPoll.clear();
+#ifdef __PSVITA__
+	CustomMap chunksToPoll;
+#else
+	unordered_map<ChunkPos,bool,ChunkPosKeyHash,ChunkPosKeyEq> chunksToPoll;
+#endif
 	
 #if 0
 	AUTO_VAR(itEnd, level->players.end());

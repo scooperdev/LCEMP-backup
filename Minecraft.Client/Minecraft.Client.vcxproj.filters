@@ -3915,6 +3915,9 @@
     <ClCompile Include="Input.cpp">
       <Filter>net\minecraft\client\player</Filter>
     </ClCompile>
+    <ClCompile Include="Windows64\KBMConfig.cpp">
+      <Filter>Windows64</Filter>
+    </ClCompile>
     <ClCompile Include="KeyboardMouseInput.cpp">
       <Filter>net\minecraft\client\player</Filter>
     </ClCompile>
@@ -4099,6 +4102,9 @@
       <Filter>net\minecraft\server</Filter>
     </ClCompile>
     <ClCompile Include="MinecraftServer.cpp">
+      <Filter>net\minecraft\server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Minecraft.Server\Core\ServerThreadPool.cpp">
       <Filter>net\minecraft\server</Filter>
     </ClCompile>
     <ClCompile Include="ServerChunkCache.cpp">
@@ -4785,85 +4791,88 @@
     <ClCompile Include="Windows64\Windows64_App.cpp">
       <Filter>Windows64</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Storage\4J_Storage.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Storage\4J_Storage.cpp">
       <Filter>Windows64\4JLibs\Storage</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Storage\STO_Main.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Storage\STO_Main.cpp">
       <Filter>Windows64\4JLibs\Storage</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Storage\STO_SaveGame.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Storage\STO_SaveGame.cpp">
       <Filter>Windows64\4JLibs\Storage</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Storage\STO_DLC.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Storage\STO_DLC.cpp">
       <Filter>Windows64\4JLibs\Storage</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\4J_Render.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Render\4J_Render.cpp">
       <Filter>Windows64\4JLibs\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\RendererCBuff.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Render\RendererCBuff.cpp">
       <Filter>Windows64\4JLibs\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\RendererCore.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Render\RendererCore.cpp">
       <Filter>Windows64\4JLibs\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\RendererMatrix.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Render\RendererMatrix.cpp">
       <Filter>Windows64\4JLibs\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\RendererState.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Render\RendererState.cpp">
       <Filter>Windows64\4JLibs\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\RendererTexture.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Render\RendererTexture.cpp">
       <Filter>Windows64\4JLibs\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\RendererVertex.cpp">
+    <ClCompile Include="Platform_Libs\Dev\Render\RendererVertex.cpp">
       <Filter>Windows64\4JLibs\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\png.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\png.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngerror.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngerror.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngget.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngget.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngmem.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngmem.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngpread.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngpread.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngread.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngread.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngrio.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngrio.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngrtran.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngrtran.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngrutil.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngrutil.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngset.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngset.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngtrans.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngtrans.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngwio.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngwio.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngwrite.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngwrite.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngwtran.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngwtran.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Libs\Dev\Render\libpng\pngwutil.c">
+    <ClCompile Include="Platform_Libs\Dev\Render\libpng\pngwutil.c">
       <Filter>Windows64\4JLibs\Render\libpng</Filter>
     </ClCompile>
     <ClCompile Include="Windows64\Network\WinsockNetLayer.cpp">
+      <Filter>Windows64</Filter>
+    </ClCompile>
+    <ClCompile Include="Windows64\Audio\VoiceChat.cpp">
       <Filter>Windows64</Filter>
     </ClCompile>
     <ClCompile Include="Durango\ApplicationView.cpp">

@@ -1,6 +1,9 @@
 # ===========================================
 # Build outputs
 # ===========================================
+build/
+build_dedicated/
+build_linux/
 x64/
 x64_Server_Release/
 x64_Server_Debug/
@@ -8,6 +11,12 @@ Minecraft.Client/x64/
 Minecraft.World/x64_Debug/
 Minecraft.World/x64_Release/
 ipch/
+MinecraftConsoles.opensdf
+MinecraftConsoles.sdf
+
+server.properties
+
+fix_include_case.ps1
 
 # ===========================================
 # Visual Studio files
@@ -70,6 +79,7 @@ Minecraft.Client/OrbisMedia/
 Minecraft.Client/PS3Media/
 Minecraft.Client/PSVitaMedia/
 Minecraft.Client/Windows64Media/*
+!Minecraft.Client/Windows64Media/strings.h
 !Minecraft.Client/Windows64Media/Media/
 Minecraft.Client/Windows64Media/Media/*
 !Minecraft.Client/Windows64Media/Media/skinHDWin.swf
@@ -208,5 +218,85 @@ Minecraft.Client/PS3/PS3Extras/HeapInspector/
 # Sony remote storage libs
 Minecraft.Client/Common/Network/Sony/
 
-Minecraft.Server/
 build_dedicated/
+
+# ===========================================
+# CI build dependencies (tracked for GitHub builds)
+# ===========================================
+
+# Windows64 4J static libs + headers used by client/server builds
+!Minecraft.Client/Windows64/4JLibs/
+Minecraft.Client/Windows64/4JLibs/*
+!Minecraft.Client/Windows64/4JLibs/inc/
+!Minecraft.Client/Windows64/4JLibs/inc/*.h
+!Minecraft.Client/Windows64/4JLibs/libs/
+Minecraft.Client/Windows64/4JLibs/libs/*
+!Minecraft.Client/Windows64/4JLibs/libs/*.lib
+
+# Windows64 Iggy middleware headers/libs/runtime
+!Minecraft.Client/Windows64/Iggy/
+Minecraft.Client/Windows64/Iggy/*
+!Minecraft.Client/Windows64/Iggy/include/
+!Minecraft.Client/Windows64/Iggy/include/*.h
+!Minecraft.Client/Windows64/Iggy/gdraw/
+!Minecraft.Client/Windows64/Iggy/gdraw/**
+!Minecraft.Client/Windows64/Iggy/lib/
+Minecraft.Client/Windows64/Iggy/lib/*
+!Minecraft.Client/Windows64/Iggy/lib/*.lib
+!Minecraft.Client/Windows64/Iggy/lib/redist64/
+Minecraft.Client/Windows64/Iggy/lib/redist64/*
+!Minecraft.Client/Windows64/Iggy/lib/redist64/*.dll
+
+# Windows64 Miles middleware headers/libs/runtime filters
+!Minecraft.Client/Windows64/Miles/
+Minecraft.Client/Windows64/Miles/*
+!Minecraft.Client/Windows64/Miles/include/
+!Minecraft.Client/Windows64/Miles/include/*.h
+!Minecraft.Client/Windows64/Miles/lib/
+Minecraft.Client/Windows64/Miles/lib/*
+!Minecraft.Client/Windows64/Miles/lib/*.lib
+!Minecraft.Client/Windows64/Miles/lib/redist64/
+Minecraft.Client/Windows64/Miles/lib/redist64/*
+!Minecraft.Client/Windows64/Miles/lib/redist64/*.dll
+!Minecraft.Client/Windows64/Miles/lib/redist64/*.asi
+!Minecraft.Client/Windows64/Miles/lib/redist64/*.flt
+
+!Minecraft.Client/Windows64/Sentient/
+Minecraft.Client/Windows64/Sentient/*
+!Minecraft.Client/Windows64/Sentient/*.h
+
+# Legacy Windows runtime filter files copied by project scripts
+!Minecraft.Client/redist64/
+Minecraft.Client/redist64/*
+!Minecraft.Client/redist64/*.dll
+!Minecraft.Client/redist64/*.asi
+!Minecraft.Client/redist64/*.flt
+
+# Windows resource/icon files required by MSBuild client build
+!Minecraft.Client/Xbox/MinecraftWindows.rc
+!Minecraft.Client/Xbox/MinecraftWindows.ico
+!Minecraft.Client/Xbox/small.ico
+
+# Core game assets tracked for CI/runtime packaging
+!Minecraft.Client/music/
+!Minecraft.Client/music/**
+
+!Minecraft.Client/Common/DLC/
+!Minecraft.Client/Common/DLC/**
+
+!Minecraft.Client/Common/Media/
+!Minecraft.Client/Common/Media/**
+
+!Minecraft.Client/Common/res/
+!Minecraft.Client/Common/res/**
+
+!Minecraft.Client/Common/DummyTexturePack/
+!Minecraft.Client/Common/DummyTexturePack/**
+
+!Minecraft.Client/Windows64Media/
+!Minecraft.Client/Windows64Media/**
+
+# Required by Windows64 post-build copy step in Minecraft.Client.vcxproj
+!Minecraft.Client/Durango/Sound/
+Minecraft.Client/Durango/Sound/*
+!Minecraft.Client/Durango/Sound/Minecraft.msscmp

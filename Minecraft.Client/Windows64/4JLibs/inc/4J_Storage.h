@@ -1,6 +1,9 @@
 #pragma once
 #include <vector>
 //#include <xtms.h>
+#ifdef __linux__
+#include "extraX64.h"
+#endif
 class C4JStringTable;
 
 #define MAX_DISPLAYNAME_LENGTH 128 // CELL_SAVEDATA_SYSP_SUBTITLE_SIZE on PS3
@@ -276,6 +279,7 @@ public:
 	void						GetDefaultSaveThumbnail(PBYTE *ppbSaveThumbnail,DWORD *pdwSaveThumbnailBytes);																		// Get the default save thumbnail (as set by SetDefaultImages)
 	C4JStorage::ESaveGameState	SaveSaveData(int( *Func)(LPVOID ,const bool),LPVOID lpParam);
 	void						CopySaveDataToNewSave(PBYTE pbThumbnail,DWORD cbThumbnail,WCHAR *wchNewName,int ( *Func)(LPVOID lpParam, bool), LPVOID lpParam);
+	bool						DeleteCurrentSaveData();
 	void						SetSaveDeviceSelected(unsigned int uiPad,bool bSelected);	
 	bool						GetSaveDeviceSelected(unsigned int iPad);
 	C4JStorage::ESaveGameState	DoesSaveExist(bool *pbExists);

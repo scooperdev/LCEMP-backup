@@ -4,11 +4,11 @@
 #include "MultiPlayerLocalPlayer.h"
 #include "User.h"
 #include "LocalPlayer.h"
-#include "..\Minecraft.World\\net.minecraft.world.entity.player.h"
-#include "..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\Minecraft.World\net.minecraft.world.inventory.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.h"
+#include "../Minecraft.World/net.minecraft.world.entity.player.h"
+#include "../Minecraft.World/net.minecraft.world.item.h"
+#include "../Minecraft.World/net.minecraft.world.inventory.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.h"
 
 CreativeMode::CreativeMode(Minecraft *minecraft) : GameMode(minecraft)
 {

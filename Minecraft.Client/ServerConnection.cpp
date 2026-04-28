@@ -4,10 +4,13 @@
 #include "PendingConnection.h"
 #include "PlayerConnection.h"
 #include "ServerPlayer.h"
-#include "..\Minecraft.World\net.minecraft.network.h"
-#include "..\Minecraft.World\Socket.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.network.h"
+#include "../Minecraft.World/Socket.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
 #include "MultiPlayerLevel.h"
+#ifdef WITH_SERVER_CODE
+#include "../Minecraft.Server/Core/ServerThreadPool.h"
+#endif
 
 ServerConnection::ServerConnection(MinecraftServer *server)
 {
@@ -98,16 +101,12 @@ void ServerConnection::tick()
 		{
 			serverPlayer->doChunkSendingTick(false);
 		}
-//        try {	// 4J - removed try/catch
             player->tick();
-//        } catch (Exception e) {
-//            logger.log(Level.WARNING, "Failed to handle packet: " + e, e);
-//            player.disconnect("Internal server error");
-//        }
         if (player->done)
 		{
             players.erase(players.begin()+i);
 			i--;
+			continue;
         }
         player->connection->flush();
     }

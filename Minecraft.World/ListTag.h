@@ -51,7 +51,7 @@ public:
 
     void print(char *prefix, ostream out)
 	{
-        Tag::print(prefix, out);
+		Tag::print(out);
 
 		out << prefix << "{" << endl;
 
@@ -60,7 +60,7 @@ public:
 		strcat( newPrefix, "   ");
 		AUTO_VAR(itEnd, list.end());
         for (AUTO_VAR(it, list.begin()); it != itEnd; it++)
-            (*it)->print(newPrefix, out);
+            (*it)->print(out);
 		delete[] newPrefix;
 		out << prefix << "}" << endl;
 	}

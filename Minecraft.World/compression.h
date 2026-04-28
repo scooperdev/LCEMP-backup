@@ -2,7 +2,7 @@
 #include "FileHeader.h"
 
 #ifdef _XBOX_ONE
-#include "..\Minecraft.Client\Durango\DurangoExtras\xcompress.h"
+#include "../Minecraft.Client/Durango/DurangoExtras/xcompress.h"
 #endif
 
 class Compression
@@ -59,7 +59,7 @@ private:
 
 	HRESULT DecompressWithType(void *pDestination, unsigned int *pDestSize, void *pSource, unsigned int SrcSize);
 
-#if defined __ORBIS__ || defined __PS3__
+#if defined __ORBIS__ || defined __PS3__ || defined __linux__
 #else
 	XMEMCOMPRESSION_CONTEXT compressionContext;
 	XMEMDECOMPRESSION_CONTEXT decompressionContext;

@@ -14,49 +14,54 @@
 #include "Settings.h"
 #include "ServerChunkCache.h"
 #include "ServerLevelListener.h"
-#include "..\Minecraft.World\AABB.h"
-#include "..\Minecraft.World\Vec3.h"
-#include "..\Minecraft.World\net.minecraft.network.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\net.minecraft.world.level.storage.h"
-#include "..\Minecraft.World\net.minecraft.world.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.world.level.tile.h"
-#include "..\Minecraft.World\Pos.h"
-#include "..\Minecraft.World\System.h"
-#include "..\Minecraft.World\StringHelpers.h"
+#include "../Minecraft.World/AABB.h"
+#include "../Minecraft.World/Vec3.h"
+#include "../Minecraft.World/net.minecraft.network.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/net.minecraft.world.level.storage.h"
+#include "../Minecraft.World/net.minecraft.world.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.world.level.tile.h"
+#include "../Minecraft.World/Pos.h"
+#include "../Minecraft.World/System.h"
+#include "../Minecraft.World/StringHelpers.h"
 #ifdef SPLIT_SAVES
-#include "..\Minecraft.World\ConsoleSaveFileSplit.h"
+#include "../Minecraft.World/ConsoleSaveFileSplit.h"
 #endif
-#include "..\Minecraft.World\ConsoleSaveFileOriginal.h"
-#include "..\Minecraft.World\Socket.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.h"
+#include "../Minecraft.World/ConsoleSaveFileOriginal.h"
+#include "../Minecraft.World/Socket.h"
+#include "../Minecraft.World/net.minecraft.world.entity.h"
 #include "ProgressRenderer.h"
 #include "ServerPlayer.h"
 #include "PlayerConnection.h"
 #include "GameRenderer.h"
 #ifdef _WINDOWS64
-#include "Windows64\Network\WinsockNetLayer.h"
+#include "Windows64/Network/WinsockNetLayer.h"
+#elif defined(WITH_SERVER_CODE)
+#include "../Minecraft.Server/Linux/PosixNetLayer.h"
 #endif
-#include "..\Minecraft.World\ThreadName.h"
-#include "..\Minecraft.World\IntCache.h"
-#include "..\Minecraft.World\CompressedTileStorage.h"
-#include "..\Minecraft.World\SparseLightStorage.h"
-#include "..\Minecraft.World\SparseDataStorage.h"
-#include "..\Minecraft.World\compression.h"
+#if defined(__linux__) || defined(_WIN32)
+#include "../Minecraft.Server/Core/ServerThreadPool.h"
+#endif
+#include "../Minecraft.World/ThreadName.h"
+#include "../Minecraft.World/IntCache.h"
+#include "../Minecraft.World/CompressedTileStorage.h"
+#include "../Minecraft.World/SparseLightStorage.h"
+#include "../Minecraft.World/SparseDataStorage.h"
+#include "../Minecraft.World/compression.h"
 #ifdef _XBOX
-#include "Common\XUI\XUI_DebugSetCamera.h"
+#include "Common/XUI/XUI_DebugSetCamera.h"
 #endif
-#include "PS3\PS3Extras\ShutdownManager.h"
+#include "PS3/PS3Extras/ShutdownManager.h"
 #include "ServerCommandDispatcher.h"
 
 #ifdef WITH_SERVER_CODE
-#include "..\Minecraft.Server\Commands\ServerCommands.h"
+#include "../Minecraft.Server/Commands/ServerCommands.h"
 #endif
 
-#include "..\Minecraft.World\BiomeSource.h"
+#include "../Minecraft.World/BiomeSource.h"
 #include "PlayerChunkMap.h"
-#include "Common\Telemetry\TelemetryManager.h"
+#include "Common/Telemetry/TelemetryManager.h"
 
 #define DEBUG_SERVER_DONT_SPAWN_MOBS 0
 
@@ -69,6 +74,7 @@ __int64 MinecraftServer::setTimeOfDay = 0;
 bool	MinecraftServer::m_bPrimaryPlayerSignedOut=false;
 bool	MinecraftServer::s_bServerHalted=false;
 bool	MinecraftServer::s_bSaveOnExitAnswered=false;
+bool	MinecraftServer::s_bDeleteCurrentSaveOnNoSaveExit=false;
 int MinecraftServer::s_slowQueuePlayerIndex = 0;
 int MinecraftServer::s_slowQueueLastTime = 0;
 bool MinecraftServer::s_slowQueuePacketSent = false;
@@ -156,7 +162,7 @@ bool MinecraftServer::initServer(__int64 seed, NetworkGameInitData *initData, DW
         //localIp = settings->getString(L"server-ip", L"");
         //onlineMode = settings->getBoolean(L"online-mode", true);
 		//motd = settings->getString(L"motd", L"A Minecraft Server");
-        //motd.replace('�', '$');
+        //motd.replace('ï¿½', '$');
 
         setAnimals(settings->getBoolean(L"spawn-animals", true));
 		setNpcsEnabled(settings->getBoolean(L"spawn-npcs", true));
@@ -517,6 +523,7 @@ bool MinecraftServer::loadLevel(LevelStorageSource *storageSource, const wstring
 	}
 	app.SetGameHostOption( eGameHostOption_HasBeenInCreative, gameType == GameType::CREATIVE || levels[0]->getHasBeenInCreative() );
 	app.SetGameHostOption( eGameHostOption_Structures, levels[0]->isGenerateMapFeatures() );
+	WinsockNetLayer::UpdateAdvertiseGameHostSettings(app.GetGameHostOption(eGameHostOption_All));
 
 	if( s_bServerHalted || !g_NetworkManager.IsInSession() ) return false;
 
@@ -607,6 +614,7 @@ bool MinecraftServer::loadLevel(LevelStorageSource *storageSource, const wstring
 
 			int twoRPlusOne = r*2 + 1;
 			int total = twoRPlusOne * twoRPlusOne;
+			app.DebugPrintf("Chunk generation starting for level %d, r=%d, total=%d chunks", i, r, total);
             for (int x = -r; x <= r && running; x += 16)
 			{
                 for (int z = -r; z <= r && running; z += 16)
@@ -629,6 +637,8 @@ bool MinecraftServer::loadLevel(LevelStorageSource *storageSource, const wstring
 //                        lastTime = now;
                     }
 					static int count = 0;
+					if (count % 50 == 0)
+						app.DebugPrintf("Chunk gen: level %d, chunk %d/%d (x=%d z=%d)", i, count, total, x, z);
 					PIXBeginNamedEvent(0,"Creating %d ", (count++)%8);
                     level->cache->create((spawnPos->x + x) >> 4, (spawnPos->z + z) >> 4, true);	// 4J - added parameter to disable postprocessing here
 					PIXEndNamedEvent();
@@ -664,6 +674,7 @@ bool MinecraftServer::loadLevel(LevelStorageSource *storageSource, const wstring
     }
 //	printf("Main thread complete at %dms\n",System::currentTimeMillis() - startTime);
 
+	app.DebugPrintf("Chunk generation complete, waiting for post-processing...");
 	// Wait for post processing, then lighting threads, to end (post-processing may make more lighting changes)
 	m_postUpdateTerminate = true;
 
@@ -877,6 +888,7 @@ bool MinecraftServer::IsSuspending()
 
 void MinecraftServer::stopServer()
 {
+	const bool shouldDeleteCurrentSaveOnNoSaveExit = (!m_saveOnExit && s_bDeleteCurrentSaveOnNoSaveExit);
 
 	// 4J-PB - need to halt the rendering of the data, since we're about to remove it
 #ifdef __PS3__
@@ -971,6 +983,40 @@ void MinecraftServer::stopServer()
 	players = NULL;
 	delete settings;
 	settings = NULL;
+
+	if( shouldDeleteCurrentSaveOnNoSaveExit )
+	{
+		bool deleteRes = false;
+		char uniqueFilename[32] = { 0 };
+
+		if (StorageManager.GetSaveUniqueFilename(uniqueFilename))
+		{
+			StorageManager.GetSavesInfo(ProfileManager.GetPrimaryPad(), NULL, NULL, "save");
+			PSAVE_DETAILS pSaveDetails = StorageManager.ReturnSavesInfo();
+			if (pSaveDetails != NULL)
+			{
+				const size_t uniqueLen = strlen(uniqueFilename);
+				for (int i = 0; i < pSaveDetails->iSaveC; ++i)
+				{
+					const char *saveFilename = pSaveDetails->SaveInfoA[i].UTF8SaveFilename;
+					const size_t saveLen = strlen(saveFilename);
+					if (saveLen >= uniqueLen && strcmp(saveFilename + (saveLen - uniqueLen), uniqueFilename) == 0)
+					{
+						StorageManager.DeleteSaveData(&pSaveDetails->SaveInfoA[i], NULL, NULL);
+						deleteRes = true;
+						break;
+					}
+				}
+			}
+		}
+
+		app.DebugPrintf("No-save exit cleanup for new world: %s\n", deleteRes ? "success" : "failed");
+	}
+	s_bDeleteCurrentSaveOnNoSaveExit = false;
+
+#if defined(WITH_SERVER_CODE) || defined(_WIN32)
+	ServerThreadPool::Shutdown();
+#endif
 
 	g_NetworkManager.ServerStopped();
 }
@@ -1474,6 +1520,33 @@ void MinecraftServer::tick()
 	
     tickCount++;
 
+#ifdef WITH_SERVER_CODE
+	if (tickCount % 6000 == 0 && !s_bServerHalted)
+	{
+		app.DebugPrintf("Auto-saving world...\n");
+		if (players != NULL)
+		{
+			players->saveAll(NULL);
+		}
+		for (unsigned int j = 0; j < levels.length; j++)
+		{
+			if (s_bServerHalted) break;
+			ServerLevel *level = levels[levels.length - 1 - j];
+			if (level) level->save(false, NULL, true);
+		}
+		if (!s_bServerHalted)
+		{
+			saveGameRules();
+			levels[0]->saveToDisc(NULL, true);
+		}
+		while (StorageManager.GetSaveState() != C4JStorage::ESaveGame_Idle)
+		{
+			Sleep(10);
+		}
+		app.DebugPrintf("Auto-save complete\n");
+	}
+#endif
+
 	// 4J We need to update client difficulty levels based on the servers
 	Minecraft *pMinecraft = Minecraft::GetInstance();
 	// 4J-PB - sending this on the host changing the difficulty in the menus
@@ -1485,24 +1558,89 @@ void MinecraftServer::tick()
 
     for (unsigned int i = 0; i < levels.length; i++)
 	{
-//        if (i == 0 || settings->getBoolean(L"allow-nether", true))		// 4J removed - we always have nether
-		{
             ServerLevel *level = levels[i];
-
-			// 4J Stu - We set the levels difficulty based on the minecraft options
-			level->difficulty = app.GetGameHostOption(eGameHostOption_Difficulty); //pMinecraft->options->difficulty;
-
+			level->difficulty = app.GetGameHostOption(eGameHostOption_Difficulty);
 #if DEBUG_SERVER_DONT_SPAWN_MOBS
 			level->setSpawnSettings(false, false);
 #else
 			level->setSpawnSettings(level->difficulty > 0 && !Minecraft::GetInstance()->isTutorial(), animals);
 #endif
-
             if (tickCount % 20 == 0)
 			{
                 players->broadcastAll( shared_ptr<SetTimePacket>( new SetTimePacket(level->getTime() ) ), level->dimension->id);
             }
-// #ifndef __PS3__
+    }
+
+#if defined(WITH_SERVER_CODE) || defined(_WIN32)
+	if (!ServerThreadPool::IsInitialized())
+		ServerThreadPool::Initialize();
+
+	struct DimensionTickData
+	{
+		ServerLevel *level;
+		PlayerList *players;
+	};
+
+	int activeLevels = 0;
+	DimensionTickData dimData[3];
+	for (unsigned int i = 0; i < levels.length && i < 3; i++)
+	{
+		dimData[i].level = levels[i];
+		dimData[i].players = players;
+		activeLevels++;
+	}
+
+	if (activeLevels > 1 && ServerThreadPool::IsInitialized())
+	{
+		for (int i = 0; i < activeLevels; i++)
+		{
+			try
+			{
+				((Level *)dimData[i].level)->tick();
+			}
+			catch (...)
+			{
+			}
+		}
+
+		ServerThreadPool::ParallelFor(0, activeLevels, [](int idx, void *param) {
+			DimensionTickData *data = (DimensionTickData *)param;
+			ServerLevel *level = data[idx].level;
+
+			try
+			{
+				while (level->updateLights())
+					;
+			}
+			catch (...)
+			{
+			}
+		}, dimData);
+
+		for (int i = 0; i < activeLevels; i++)
+		{
+			ServerLevel *level = dimData[i].level;
+			PlayerList *pPlayers = dimData[i].players;
+
+			try
+			{
+				if ((pPlayers->getPlayerCount(level) > 0) || (level->hasEntitiesToRemove()))
+					level->tickEntities();
+
+				level->getTracker()->tick();
+			}
+			catch (...)
+			{
+			}
+		}
+	}
+	else
+#endif
+	{
+		for (unsigned int i = 0; i < levels.length; i++)
+		{
+			ServerLevel *level = levels[i];
+
 			static __int64 stc = 0;
 			__int64 st0 = System::currentTimeMillis();
 			PIXBeginNamedEvent(0,"Level tick %d",i);
@@ -1512,7 +1650,7 @@ void MinecraftServer::tick()
 			PIXBeginNamedEvent(0,"Update lights %d",i);
 			// 4J - used to be in a while loop, but we don't want the server locking up for a big chunk of time (could end up trying to process 1,000,000 lights...)
 			// Instead call this once, which will try and process up to 2000 lights per tick
-//			printf("lights: %d\n",level->getLightsToUpdate());
+			//printf("lights: %d\n",level->getLightsToUpdate());
             while(level->updateLights() )
 				;
 			__int64 st2 = System::currentTimeMillis();
@@ -1525,7 +1663,7 @@ void MinecraftServer::tick()
 			if( ( players->getPlayerCount(level) > 0) || ( level->hasEntitiesToRemove() ) )
 			{
 #ifdef __PSVITA__
-				// AP - the PlayerList->viewDistance initially starts out at 3 to make starting a level speedy
+// AP - the PlayerList->viewDistance initially starts out at 3 to make starting a level speedy
 				// the problem with this is that spawned monsters are always generated on the edge of the known map
 				// which means they wont process (unless they are surrounded by 2 visible chunks). This means
 				// they wont checkDespawn so they are NEVER removed which results in monsters not spawning.
@@ -1544,16 +1682,15 @@ void MinecraftServer::tick()
 			PIXEndNamedEvent();
 
 			__int64 st3 = System::currentTimeMillis();
-//			printf(">>>>>>>>>>>>>>>>>>>>>> Tick %d %d %d : %d\n", st1 - st0, st2 - st1, st3 - st2, st0 - stc );
 			stc = st0;
-// #endif// __PS3__
-        }
-    }
-	Entity::tickExtraWandering();	// 4J added
+		}
+	}
+	Entity::tickExtraWandering();
 
-#ifdef WITH_SERVER_CODE
+#if defined(WITH_SERVER_CODE) || defined(_WIN32)
 	g_NetworkManager.DoWork();
 	WinsockNetLayer::FlushPendingData();
+	WinsockNetLayer::FlushSendBuffers();
 #endif
 
 	PIXBeginNamedEvent(0,"Connection tick");

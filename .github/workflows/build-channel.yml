@@ -1,0 +1,494 @@
+name: Automated Build Channel (LCEMP)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * *"
+  push:
+    paths:
+      - ".github/workflows/build-channel.yml"
+      - "**/*.c"
+      - "**/*.cc"
+      - "**/*.cpp"
+      - "**/*.cxx"
+      - "**/*.h"
+      - "**/*.hh"
+      - "**/*.hpp"
+      - "**/*.hxx"
+      - "**/*.inl"
+      - "**/*.cmake"
+      - "**/CMakeLists.txt"
+      - "**/*.vcxproj"
+      - "**/*.vcxproj.filters"
+      - "**/*.sln"
+
+concurrency:
+  group: automated-build-channel-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUILD_TYPE: Release
+  WINDOWS_PLATFORM_TOOLSET: v143
+
+jobs:
+  windows64_client:
+    name: Windows64 Client
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Preflight Windows client dependencies
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            "Minecraft.Client\\Windows64\\Iggy\\lib\\iggy_w64.lib",
+            "Minecraft.Client\\Windows64\\Iggy\\gdraw\\gdraw_d3d11.h",
+            "Minecraft.Client\\Windows64\\Miles\\lib\\mss64.lib",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Input\\4J_Input.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Profile\\4J_Profile.cpp",
+            "Minecraft.Client\\Durango\\Sound\\Minecraft.msscmp",
+            "Minecraft.Client\\Windows64\\Sentient\\SentientTelemetryCommon.h",
+            "Minecraft.Client\\Windows64\\Sentient\\MinecraftTelemetry.h",
+            "Minecraft.Client\\Common\\DLC\\DLCManager.h",
+            "Minecraft.Client\\Common\\DLC\\DLCFile.cpp"
+          )
+
+          $requiredDirs = @(
+            "Minecraft.Client\\music",
+            "Minecraft.Client\\Common\\Media",
+            "Minecraft.Client\\Common\\res",
+            "Minecraft.Client\\Common\\DummyTexturePack",
+            "Minecraft.Client\\Windows64Media"
+          )
+
+          $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path $_) })
+          $missingDirs = @($requiredDirs | Where-Object { -not (Test-Path $_) })
+
+          $missing = @()
+          if ($missingFiles.Count -gt 0) {
+            $missing += $missingFiles | ForEach-Object { "[file] $_" }
+          }
+          if ($missingDirs.Count -gt 0) {
+            $missing += $missingDirs | ForEach-Object { "[dir]  $_" }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing required Windows client dependencies:`n$($missing -join "`n")"
+            exit 1
+          }
+
+      - name: Build Minecraft.Client (Release)
+        shell: pwsh
+        run: |
+          msbuild .\Minecraft.World\Minecraft.World.vcxproj `
+            /m `
+            /t:Build `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:PlatformToolset=${{ env.WINDOWS_PLATFORM_TOOLSET }} `
+            /p:PreferredToolArchitecture=x64 `
+            /p:UseMultiToolTask=true `
+            /p:CL_MPCount=8 `
+            /verbosity:minimal
+
+          if (-not (Test-Path .\Minecraft.World\x64_Release\Minecraft.World.lib)) {
+            throw "Minecraft.World.lib was not produced at .\\Minecraft.World\\x64_Release\\Minecraft.World.lib"
+          }
+
+          msbuild .\\Minecraft.Client\\Minecraft.Client.vcxproj `
+            /m `
+            /t:Build `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:PlatformToolset=${{ env.WINDOWS_PLATFORM_TOOLSET }} `
+            /p:PreferredToolArchitecture=x64 `
+            /p:UseMultiToolTask=true `
+            /p:CL_MPCount=8 `
+            /p:BuildProjectReferences=true `
+            /verbosity:minimal
+
+      - name: Stage Windows64 client package
+        shell: pwsh
+        run: |
+          $outRoots = @(
+            ".\\Minecraft.Client\\x64\\Release",
+            ".\\Minecraft.Client\\x64_Release",
+            ".\\x64\\Release",
+            ".\\x64_Release"
+          )
+
+          $root = $outRoots | Where-Object {
+            Test-Path (Join-Path $_ "Minecraft.Client.exe")
+          } | Select-Object -First 1
+
+          if (-not $root) {
+            $fallback = Get-ChildItem -Path . -Filter "Minecraft.Client.exe" -Recurse -File -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+
+            if ($fallback) {
+              $root = $fallback.DirectoryName
+            }
+          }
+
+          if (-not $root) {
+            throw "Could not locate Windows client output directory."
+          }
+
+          $stageRoot = ".\\artifacts\\windows64-client"
+          $packageRoot = Join-Path $stageRoot "package"
+          New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
+
+          $requiredRuntimeFiles = @(
+            "Minecraft.Client.exe",
+            "iggy_w64.dll",
+            "mss64.dll"
+          )
+
+          $optionalRuntimeFiles = @(
+            "XInput9_1_0.dll",
+            "Effects.msscmp",
+            "kbm_config.ini"
+          )
+
+          $runtimeSearchRoots = @(
+            $root
+            $outRoots
+          ) | Where-Object { $_ } | Select-Object -Unique
+
+          $runtimeCandidates = @{
+            "Minecraft.Client.exe" = @(
+              $runtimeSearchRoots | ForEach-Object { Join-Path $_ "Minecraft.Client.exe" }
+            )
+            "iggy_w64.dll" = @(
+              $runtimeSearchRoots | ForEach-Object { Join-Path $_ "iggy_w64.dll" }
+            ) + @(
+              ".\\Minecraft.Client\\Windows64\\Iggy\\lib\\redist64\\iggy_w64.dll"
+            )
+            "mss64.dll" = @(
+              $runtimeSearchRoots | ForEach-Object { Join-Path $_ "mss64.dll" }
+            ) + @(
+              ".\\Minecraft.Client\\Windows64\\Miles\\lib\\redist64\\mss64.dll",
+              ".\\Minecraft.Client\\mss64.dll"
+            )
+            "XInput9_1_0.dll" = @(
+              $runtimeSearchRoots | ForEach-Object { Join-Path $_ "XInput9_1_0.dll" }
+            ) + @(
+              (Join-Path $env:WINDIR "System32\\XInput9_1_0.dll"),
+              (Join-Path $env:WINDIR "SysWOW64\\XInput9_1_0.dll")
+            )
+            "Effects.msscmp" = @(
+              (Join-Path $root "Effects.msscmp"),
+              ".\\Minecraft.Client\\Effects.msscmp"
+            )
+            "kbm_config.ini" = @(
+              (Join-Path $root "kbm_config.ini"),
+              ".\\Minecraft.Client\\kbm_config.ini"
+            )
+          }
+
+          foreach ($f in $requiredRuntimeFiles + $optionalRuntimeFiles) {
+            $candidate = $runtimeCandidates[$f] | Where-Object {
+              $_ -and (Test-Path $_)
+            } | Select-Object -First 1
+
+            if ($candidate) {
+              Copy-Item $candidate (Join-Path $packageRoot $f) -Force
+            }
+          }
+
+          $missingRuntime = @(
+            $requiredRuntimeFiles | Where-Object {
+              -not (Test-Path (Join-Path $packageRoot $_))
+            }
+          )
+
+          if ($missingRuntime.Count -gt 0) {
+            throw "Missing required runtime files in package: $($missingRuntime -join ', ')"
+          }
+
+          $missingOptionalRuntime = @(
+            $optionalRuntimeFiles | Where-Object {
+              -not (Test-Path (Join-Path $packageRoot $_))
+            }
+          )
+
+          if ($missingOptionalRuntime.Count -gt 0) {
+            Write-Host "Optional runtime files not found: $($missingOptionalRuntime -join ', ')"
+          }
+
+          foreach ($dir in @("redist64", "Windows64")) {
+            $src = Join-Path $root $dir
+            if (Test-Path $src) {
+              Copy-Item $src (Join-Path $packageRoot $dir) -Recurse -Force
+            }
+          }
+
+          # Mirror the runnable x64\Release asset layout.
+          $assetDirs = @(
+            @{ Dest = "Common\\Media"; Output = (Join-Path $root "Common\\Media"); Source = ".\\Minecraft.Client\\Common\\Media" },
+            @{ Dest = "Common\\res"; Output = (Join-Path $root "Common\\res"); Source = ".\\Minecraft.Client\\Common\\res" },
+            @{ Dest = "Common\\DummyTexturePack"; Output = (Join-Path $root "Common\\DummyTexturePack"); Source = ".\\Minecraft.Client\\Common\\DummyTexturePack" },
+            @{ Dest = "music"; Output = (Join-Path $root "music"); Source = ".\\Minecraft.Client\\music" },
+            @{ Dest = "Windows64Media"; Output = (Join-Path $root "Windows64Media"); Source = ".\\Minecraft.Client\\Windows64Media" }
+          )
+
+          foreach ($entry in $assetDirs) {
+            $src = $null
+            if (Test-Path $entry.Output) {
+              $src = $entry.Output
+            } elseif (Test-Path $entry.Source) {
+              $src = $entry.Source
+            }
+
+            if (-not $src) {
+              throw "Missing required asset directory: $($entry.Dest)"
+            }
+
+            $dest = Join-Path $packageRoot $entry.Dest
+            New-Item -ItemType Directory -Force -Path (Split-Path $dest -Parent) | Out-Null
+            Copy-Item $src $dest -Recurse -Force
+          }
+
+          $durangoDest = Join-Path $packageRoot "Durango\\Sound"
+          New-Item -ItemType Directory -Force -Path $durangoDest | Out-Null
+
+          $durangoCandidates = @(
+            (Join-Path $root "Durango\\Sound\\Minecraft.msscmp"),
+            ".\\Minecraft.Client\\Durango\\Sound\\Minecraft.msscmp"
+          )
+
+          $durangoSource = $durangoCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $durangoSource) {
+            throw "Missing required asset file: Durango\\Sound\\Minecraft.msscmp"
+          }
+
+          Copy-Item $durangoSource (Join-Path $durangoDest "Minecraft.msscmp") -Force
+
+          $zipPath = Join-Path $stageRoot "windows64-client-snapshot-${{ github.run_number }}.zip"
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+
+          Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $zipPath -CompressionLevel Optimal
+
+          if (-not (Test-Path $zipPath)) {
+            throw "Failed to create Windows client snapshot zip."
+          }
+
+      - name: Upload Windows64 client artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows64-client-snapshot-${{ github.run_number }}
+          path: artifacts/windows64-client/windows64-client-snapshot-${{ github.run_number }}.zip
+          retention-days: 5
+          compression-level: 0
+
+  linux_dedicated_server:
+    name: Linux Dedicated Server
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Preflight Linux shared sources
+        run: |
+          required=(
+            "./Minecraft.Client/Common/DLC/DLCFile.cpp"
+            "./Minecraft.Client/Common/DLC/DLCManager.h"
+            "./Minecraft.Client/Windows64/Sentient/SentientTelemetryCommon.h"
+            "./Minecraft.Client/Windows64/Sentient/MinecraftTelemetry.h"
+          )
+          missing=()
+          for f in "${required[@]}"; do
+            if [ ! -f "$f" ]; then
+              missing+=("$f")
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf 'Missing required shared source files:\n' >&2
+            printf '%s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-dedicated-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-dedicated-${{ runner.os }}-${{ github.ref_name }}-
+            ccache-linux-dedicated-${{ runner.os }}-
+
+      - name: Configure (Release)
+        run: |
+          cmake -S ./Minecraft.Server -B ./build-server-linux -G Ninja \
+            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build MinecraftDedicatedServer
+        run: cmake --build ./build-server-linux --target MinecraftDedicatedServer --parallel
+
+      - name: Strip Linux binary
+        run: strip ./build-server-linux/MinecraftDedicatedServer || true
+
+      - name: Stage Linux dedicated server artifact
+        run: |
+          mkdir -p ./artifacts/linux-dedicated-server
+          cp ./build-server-linux/MinecraftDedicatedServer ./artifacts/linux-dedicated-server/
+          cp ./server.properties ./artifacts/linux-dedicated-server/server.properties || true
+
+      - name: Upload Linux dedicated server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-dedicated-server-snapshot-${{ github.run_number }}
+          path: artifacts/linux-dedicated-server/**
+          retention-days: 5
+          compression-level: 1
+
+  windows_dedicated_server:
+    name: Windows Dedicated Server
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Preflight Windows server dependencies
+        shell: pwsh
+        run: |
+          $required = @(
+            "Minecraft.Client\\Platform_Libs\\Dev\\Storage\\4J_Storage.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Storage\\STO_SaveGame.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Profile\\4J_Profile.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Render\\4J_Render.cpp",
+            "Minecraft.Client\\Platform_Libs\\Dev\\Render\\libpng\\png.c",
+            "Minecraft.Client\\Windows64\\Iggy\\gdraw\\gdraw_d3d11.h",
+            "Minecraft.Client\\Windows64\\Sentient\\SentientTelemetryCommon.h",
+            "Minecraft.Client\\Windows64\\Sentient\\MinecraftTelemetry.h",
+            "Minecraft.Client\\Common\\DLC\\DLCManager.h",
+            "Minecraft.Client\\Common\\DLC\\DLCFile.cpp"
+          )
+
+          $missing = @($required | Where-Object { -not (Test-Path $_) })
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing required Windows dedicated server files:`n$($missing -join "`n")"
+            exit 1
+          }
+
+      - name: Build Minecraft.World (Release)
+        shell: pwsh
+        run: |
+          msbuild .\Minecraft.World\Minecraft.World.vcxproj `
+            /m `
+            /t:Build `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:PlatformToolset=${{ env.WINDOWS_PLATFORM_TOOLSET }} `
+            /p:PreferredToolArchitecture=x64 `
+            /p:UseMultiToolTask=true `
+            /p:CL_MPCount=8 `
+            /verbosity:minimal
+
+          if (-not (Test-Path .\Minecraft.World\x64_Release\Minecraft.World.lib)) {
+            throw "Minecraft.World.lib was not produced at .\\Minecraft.World\\x64_Release\\Minecraft.World.lib"
+          }
+
+      - name: Build Minecraft.Server (Release)
+        shell: pwsh
+        run: |
+          msbuild .\\Minecraft.Server\\Minecraft.Server.vcxproj `
+            /m `
+            /t:Build `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:PlatformToolset=${{ env.WINDOWS_PLATFORM_TOOLSET }} `
+            /p:PreferredToolArchitecture=x64 `
+            /p:UseMultiToolTask=true `
+            /p:CL_MPCount=8 `
+            /p:BuildProjectReferences=true `
+            /verbosity:minimal
+
+      - name: Stage Windows dedicated server artifact
+        shell: pwsh
+        run: |
+          $outRoots = @(
+            ".\\Minecraft.Server\\x64_Server_Release",
+            ".\\Minecraft.Server\\x64\\Release",
+            ".\\Minecraft.Server\\x64_Release",
+            ".\\x64_Server_Release",
+            ".\\x64_Release"
+          )
+
+          $root = $outRoots | Where-Object {
+            Test-Path (Join-Path $_ "Minecraft.Server.exe")
+          } | Select-Object -First 1
+
+          if (-not $root) {
+            $fallback = Get-ChildItem -Path . -Filter "Minecraft.Server.exe" -Recurse -File -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+
+            if ($fallback) {
+              $root = $fallback.DirectoryName
+            }
+          }
+
+          if (-not $root) {
+            throw "Could not locate Windows dedicated server output directory."
+          }
+
+          New-Item -ItemType Directory -Force -Path .\\artifacts\\windows-dedicated-server | Out-Null
+
+          $files = @(
+            "Minecraft.Server.exe",
+            "Minecraft.Server.pdb",
+            "server.properties"
+          )
+
+          foreach ($f in $files) {
+            $p = Join-Path $root $f
+            if (Test-Path $p) {
+              Copy-Item $p .\\artifacts\\windows-dedicated-server\\ -Force
+            }
+          }
+
+          if (-not (Test-Path .\\artifacts\\windows-dedicated-server\\Minecraft.Server.exe)) {
+            throw "Minecraft.Server.exe was not produced."
+          }
+
+      - name: Upload Windows dedicated server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-dedicated-server-snapshot-${{ github.run_number }}
+          path: artifacts/windows-dedicated-server/**
+          retention-days: 5
+          compression-level: 1

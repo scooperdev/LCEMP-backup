@@ -4,23 +4,23 @@
 #include "stdafx.h"
 
 #include <assert.h>
-#include "..\..\..\Minecraft.World\AABB.h"
-#include "..\..\..\Minecraft.World\Vec3.h"
-#include "..\..\..\Minecraft.World\net.minecraft.stats.h"
-#include "..\..\..\Minecraft.Client\StatsCounter.h"
-#include "..\..\..\Minecraft.World\Entity.h"
-#include "..\..\..\Minecraft.World\Level.h"
-#include "..\..\..\Minecraft.Client\MultiplayerLocalPlayer.h"
-#include "..\..\MinecraftServer.h"
-#include "..\..\MultiPlayerLevel.h"
-#include "..\..\ProgressRenderer.h"
-#include "..\..\..\Minecraft.World\DisconnectPacket.h"
-#include "..\..\Minecraft.h"
-#include "..\..\Options.h"
-#include "..\..\..\Minecraft.World\compression.h"
-#include "..\..\TexturePackRepository.h"
-#include "..\..\TexturePack.h"
-#include "..\..\DLCTexturePack.h"
+#include "../../../Minecraft.World/AABB.h"
+#include "../../../Minecraft.World/Vec3.h"
+#include "../../../Minecraft.World/net.minecraft.stats.h"
+#include "../../../Minecraft.Client/StatsCounter.h"
+#include "../../../Minecraft.World/Entity.h"
+#include "../../../Minecraft.World/Level.h"
+#include "../../../Minecraft.Client/MultiPlayerLocalPlayer.h"
+#include "../../MinecraftServer.h"
+#include "../../MultiPlayerLevel.h"
+#include "../../ProgressRenderer.h"
+#include "../../../Minecraft.World/DisconnectPacket.h"
+#include "../../Minecraft.h"
+#include "../../Options.h"
+#include "../../../Minecraft.World/compression.h"
+#include "../../TexturePackRepository.h"
+#include "../../TexturePack.h"
+#include "../../DLCTexturePack.h"
 
 #define IGNORE_KEYPRESS_TIMERID 0
 #define IGNORE_KEYPRESS_TIME 100
@@ -1050,6 +1050,21 @@ void UIScene_PauseMenu::_ExitWorld(LPVOID lpParameter)
 				case DisconnectPacket::eDisconnect_Kicked:
 					exitReasonStringId = IDS_DISCONNECTED_KICKED;
 					break;
+				case DisconnectPacket::eDisconnect_NotWhitelisted:
+					exitReasonStringId = IDS_DISCONNECTED_NOT_WHITELISTED;
+					exitReasonTitleId = IDS_CANTJOIN_TITLE;
+					break;
+				case DisconnectPacket::eDisconnect_ServerBanned:
+					exitReasonStringId = IDS_DISCONNECTED_SERVER_BANNED;
+					exitReasonTitleId = IDS_CANTJOIN_TITLE;
+					break;
+				case DisconnectPacket::eDisconnect_IPBanned:
+					exitReasonStringId = IDS_DISCONNECTED_IP_BANNED;
+					exitReasonTitleId = IDS_CANTJOIN_TITLE;
+					break;
+				case DisconnectPacket::eDisconnect_InvalidUsername:
+					exitReasonStringId = IDS_DISCONNECTED_INVALID_USERNAME;
+					break;
 				case DisconnectPacket::eDisconnect_NoUGC_AllLocal:
 					exitReasonStringId = IDS_NO_USER_CREATED_CONTENT_PRIVILEGE_ALL_LOCAL;
 					exitReasonTitleId = IDS_CONNECTION_FAILED;
@@ -1140,6 +1155,21 @@ void UIScene_PauseMenu::_ExitWorld(LPVOID lpParameter)
 			{
 			case DisconnectPacket::eDisconnect_Kicked:
 				exitReasonStringId = IDS_DISCONNECTED_KICKED;
+				break;
+			case DisconnectPacket::eDisconnect_NotWhitelisted:
+				exitReasonStringId = IDS_DISCONNECTED_NOT_WHITELISTED;
+				exitReasonTitleId = IDS_CANTJOIN_TITLE;
+				break;
+			case DisconnectPacket::eDisconnect_ServerBanned:
+				exitReasonStringId = IDS_DISCONNECTED_SERVER_BANNED;
+				exitReasonTitleId = IDS_CANTJOIN_TITLE;
+				break;
+			case DisconnectPacket::eDisconnect_IPBanned:
+				exitReasonStringId = IDS_DISCONNECTED_IP_BANNED;
+				exitReasonTitleId = IDS_CANTJOIN_TITLE;
+				break;
+			case DisconnectPacket::eDisconnect_InvalidUsername:
+				exitReasonStringId = IDS_DISCONNECTED_INVALID_USERNAME;
 				break;
 			case DisconnectPacket::eDisconnect_NoUGC_AllLocal:
 				exitReasonStringId = IDS_NO_USER_CREATED_CONTENT_PRIVILEGE_ALL_LOCAL;

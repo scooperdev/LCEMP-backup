@@ -1,8 +1,24 @@
 #include "stdafx.h"
 #include "UI.h"
 #include "UIComponent_Chat.h"
-#include "..\..\Minecraft.h"
-#include "..\..\Gui.h"
+#include "../../Minecraft.h"
+#include "../../Gui.h"
+
+static wstring stripColorCodes(const wstring &str)
+{
+	wstring result;
+	result.reserve(str.size());
+	for (size_t i = 0; i < str.size(); ++i)
+	{
+		if (str[i] == 0x00A7 && i + 1 < str.size())
+		{
+			++i;
+			continue;
+		}
+		result += str[i];
+	}
+	return result;
+}
 
 UIComponent_Chat::UIComponent_Chat(int iPad, void *initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
 {
@@ -57,8 +73,7 @@ void UIComponent_Chat::handleTimerComplete(int id)
 			{
 				m_controlLabelBackground[i].setOpacity(opacity);
 				m_labelChatText[i].setOpacity(opacity);
-				m_labelChatText[i].setLabel( pGui->getMessage(m_iPad,i) );
-
+				m_labelChatText[i].setLabel( stripColorCodes(pGui->getMessage(m_iPad, i)) );
 				anyVisible = true;
 			}
 			else

@@ -1,17 +1,17 @@
 #include "stdafx.h"
 //#include "..\Minecraft.World\JavaMath.h"
-#include "MultiplayerLocalPlayer.h"
+#include "MultiPlayerLocalPlayer.h"
 #include "ClientConnection.h"
-#include "..\Minecraft.World\net.minecraft.world.level.h"
-#include "..\Minecraft.World\net.minecraft.network.h"
-#include "..\Minecraft.World\Mth.h"
-#include "..\Minecraft.World\AABB.h"
-#include "..\Minecraft.World\net.minecraft.stats.h"
-#include "..\Minecraft.World\net.minecraft.world.inventory.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\net.minecraft.world.effect.h"
-#include "..\Minecraft.World\LevelData.h"
-#include "..\Minecraft.World\net.minecraft.world.entity.item.h"
+#include "../Minecraft.World/net.minecraft.world.level.h"
+#include "../Minecraft.World/net.minecraft.network.h"
+#include "../Minecraft.World/Mth.h"
+#include "../Minecraft.World/AABB.h"
+#include "../Minecraft.World/net.minecraft.stats.h"
+#include "../Minecraft.World/net.minecraft.world.inventory.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/net.minecraft.world.effect.h"
+#include "../Minecraft.World/LevelData.h"
+#include "../Minecraft.World/net.minecraft.world.entity.item.h"
 
 
 
@@ -164,6 +164,11 @@ void MultiplayerLocalPlayer::reallyDrop(shared_ptr<ItemEntity> itemEntity)
 
 void MultiplayerLocalPlayer::chat(const wstring& message)
 {
+	if (app.GetGameHostOption(eGameHostOption_ChatDisabled) != 0)
+	{
+		return;
+	}
+
 	connection->send( shared_ptr<ChatPacket>( new ChatPacket(message) ) );
 }
 

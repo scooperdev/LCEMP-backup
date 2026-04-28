@@ -3,10 +3,10 @@
 #include "Font.h"
 #include "Options.h"
 #include "Tesselator.h"
-#include "..\Minecraft.World\IntBuffer.h"
-#include "..\Minecraft.World\net.minecraft.h"
-#include "..\Minecraft.World\StringHelpers.h"
-#include "..\Minecraft.World\Random.h"
+#include "../Minecraft.World/IntBuffer.h"
+#include "../Minecraft.World/net.minecraft.h"
+#include "../Minecraft.World/StringHelpers.h"
+#include "../Minecraft.World/Random.h"
 
 Font::Font(Options *options, const wstring& name, Textures* textures, bool enforceUnicode, TEXTURE_NAME textureName, int cols, int rows, int charWidth, int charHeight, unsigned short charMap[]/* = nullptr */) : textures(textures)
 {
@@ -194,7 +194,6 @@ wstring Font::reorderBidi(const wstring &str)
 
 void Font::draw(const wstring &str, bool dropShadow)
 {
-	// Bind the texture
 	textures->bindTexture(m_textureName);
 
 	bool noise = false;
@@ -202,18 +201,18 @@ void Font::draw(const wstring &str, bool dropShadow)
 
 	for (int i = 0; i < (int)cleanStr.length(); ++i)
 	{
-		// Map character
 		wchar_t c = cleanStr.at(i);
+		wchar_t orig = str.at(i);
 
-		if (c == 167 && i + 1 < cleanStr.length())
+		if (orig == 167 && i + 1 < (int)str.length())
 		{
-			// 4J - following block was:
-			// int colorN = L"0123456789abcdefk".indexOf(str.toLowerCase().charAt(i + 1));
-			wchar_t ca = cleanStr[i+1];
+			wchar_t ca = str[i+1];
 			int colorN = 16;
 			if(( ca >= L'0' ) && (ca <= L'9')) colorN = ca - L'0';
 			else if(( ca >= L'a' ) && (ca <= L'f')) colorN = (ca - L'a') + 10;
 			else if(( ca >= L'A' ) && (ca <= L'F')) colorN = (ca - L'A') + 10;
+			else if( ca == L'o' || ca == L'O') { i += 1; continue; }
+			else if( ca == L'r' || ca == L'R') { colorN = 15; }
 
 			if (colorN == 16)
 			{
@@ -272,16 +271,16 @@ int Font::width(const wstring& str)
 {
 	wstring cleanStr = sanitize(str);
 
-	if (cleanStr == L"") return 0;	// 4J - was NULL comparison
+	if (cleanStr == L"") return 0;
 	int len = 0;
 
 	for (int i = 0; i < cleanStr.length(); ++i)
 	{
 		wchar_t c = cleanStr.at(i);
+		wchar_t orig = str.at(i);
 
-		if(c == 167)
+		if(orig == 167)
 		{
-			// Ignore the character used to define coloured text
 			++i;
 		}
 		else

@@ -7,13 +7,18 @@
 #include "ServerLevel.h"
 #include "PlayerList.h"
 #include "MinecraftServer.h"
-#include "..\Minecraft.World\net.minecraft.network.h"
-#include "..\Minecraft.World\pos.h"
-#include "..\Minecraft.World\net.minecraft.world.level.dimension.h"
-#include "..\Minecraft.World\net.minecraft.world.level.storage.h"
-#include "..\Minecraft.World\net.minecraft.world.item.h"
-#include "..\Minecraft.World\SharedConstants.h"
+#include "../Minecraft.World/net.minecraft.network.h"
+#include "../Minecraft.World/Pos.h"
+#include "../Minecraft.World/net.minecraft.world.level.dimension.h"
+#include "../Minecraft.World/net.minecraft.world.level.storage.h"
+#include "../Minecraft.World/net.minecraft.world.item.h"
+ #include "../Minecraft.World/SharedConstants.h"
 #include "Settings.h"
+#ifdef _DEDICATED_SERVER
+#include "../Minecraft.Server/Core/ServerLists.h"
+#include "../Minecraft.Server/Core/ServerLogger.h"
+#include "Windows64/Network/WinsockNetLayer.h"
+#endif
 // #ifdef __PS3__
 // #include "PS3\Network\NetworkPlayerSony.h"
 // #endif
@@ -164,6 +169,53 @@ void PendingConnection::handleLogin(shared_ptr<LoginPacket> packet)
     //if (true)// 4J removed !server->onlineMode)
 	bool sentDisconnect = false;
 
+#ifdef _DEDICATED_SERVER
+	if (name.empty() || name.length() > 16)
+	{
+		ServerLog(L"Disconnecting %s: Invalid username!\n", name.c_str());
+			disconnect(DisconnectPacket::eDisconnect_InvalidUsername);
+			sentDisconnect = true;
+	}
+	else
+	{
+		for (size_t ci = 0; ci < name.length(); ci++)
+		{
+			wchar_t ch = name[ci];
+			if (ch <= L' ' || ch == L'\u00A7')
+			{
+				ServerLog(L"Disconnecting %s: Invalid username!\n", name.c_str());
+				disconnect(DisconnectPacket::eDisconnect_InvalidUsername);
+				sentDisconnect = true;
+				break;
+			}
+		}
+	}
+
+	if (!sentDisconnect && ServerLists_IsPlayerBanned(name))
+	{
+		ServerLog(L"Disconnecting %s: You are banned from this server!\n", name.c_str());
+		disconnect(DisconnectPacket::eDisconnect_ServerBanned);
+		sentDisconnect = true;
+	}
+	else if (!ServerLists_IsPlayerWhitelisted(name))
+	{
+		ServerLog(L"Disconnecting %s: You are not white-listed on this server!\n", name.c_str());
+		disconnect(DisconnectPacket::eDisconnect_NotWhitelisted);
+		sentDisconnect = true;
+	}
+	else if (connection && connection->getSocket())
+	{
+		BYTE smallId = connection->getSocket()->getSmallId();
+		std::string ipStr = WinsockNetLayer::GetIPForSmallId(smallId);
+		if (!ipStr.empty() && ServerLists_IsIPBanned(wstring(ipStr.begin(), ipStr.end())))
+		{
+			ServerLog(L"Disconnecting %s: Your IP address is banned from this server!\n", name.c_str());
+			disconnect(DisconnectPacket::eDisconnect_IPBanned);
+			sentDisconnect = true;
+		}
+	}
+#endif
+
 	if( sentDisconnect )
 	{
 		// Do nothing
@@ -260,7 +312,7 @@ void PendingConnection::onDisconnect(DisconnectPacket::eDisconnectReason reason,
 void PendingConnection::handleGetInfo(shared_ptr<GetInfoPacket> packet)
 {
 	//try {
-	//String message = server->motd + "�" + server->players->getPlayerCount() + "�" + server->players->getMaxPlayers();
+	//String message = server->motd + "ï¿½" + server->players->getPlayerCount() + "ï¿½" + server->players->getMaxPlayers();
 	//connection->send(new DisconnectPacket(message));
 	connection->send(shared_ptr<DisconnectPacket>(new DisconnectPacket(DisconnectPacket::eDisconnect_ServerFull) ) );
 	connection->sendAndQuit();

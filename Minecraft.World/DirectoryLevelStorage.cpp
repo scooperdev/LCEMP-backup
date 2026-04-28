@@ -567,6 +567,7 @@ wstring DirectoryLevelStorage::getLevelId()
 
 void DirectoryLevelStorage::flushSaveFile(bool autosave)
 {
+
 #ifndef _CONTENT_PACKAGE
 	if(app.DebugSettingsOn() && app.GetGameSettingsDebugMask(ProfileManager.GetPrimaryPad())&(1L<<eDebugSetting_DistributableSave))
 	{
